@@ -103,7 +103,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-foreground">Specky</h1>
+          <h1 className="text-2xl font-bold text-foreground">Architectural Specification AI Green Optimiser</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>

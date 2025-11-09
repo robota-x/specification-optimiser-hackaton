@@ -49,7 +49,7 @@ const Auth = () => {
 
       toast({
         title: "Account created!",
-        description: "You can now sign in with your credentials.",
+        description: "Please check your email and confirm your account before signing in.",
       });
     } catch (error: any) {
       toast({
@@ -110,7 +110,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome to Specky</CardTitle>
+          <CardTitle>Welcome to Architectural Specification AI Green Optimiser</CardTitle>
           <CardDescription>Sign in or create an account to get started</CardDescription>
         </CardHeader>
         <CardContent>

@@ -6,6 +6,44 @@
 -- =====================================================
 
 -- =====================================================
+-- Table 0: User_Organisation_Mapping
+-- Many-to-many relationship between users and organisations
+-- Required for RLS policies in ESG tables
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS public.user_organisation_mapping (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  organisation_id UUID NOT NULL REFERENCES public.organisation(organisation_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, organisation_id)
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_user_organisation_mapping_user ON public.user_organisation_mapping(user_id);
+CREATE INDEX idx_user_organisation_mapping_org ON public.user_organisation_mapping(organisation_id);
+
+-- Enable RLS
+ALTER TABLE public.user_organisation_mapping ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can view their own organisation mappings
+CREATE POLICY "Users can view their organisation mappings"
+  ON public.user_organisation_mapping
+  FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Policy: Authenticated users can insert their own mappings (or system can insert)
+CREATE POLICY "Users can insert their organisation mappings"
+  ON public.user_organisation_mapping
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id OR auth.role() = 'service_role');
+
+-- Policy: Users can delete their own mappings
+CREATE POLICY "Users can delete their organisation mappings"
+  ON public.user_organisation_mapping
+  FOR DELETE
+  USING (auth.uid() = user_id OR auth.role() = 'service_role');
+
+-- =====================================================
 -- Table 1: ESG_Material_Library
 -- The "Knowledge Base" - Canonical database of materials
 -- populated from EPDs/LCA sources

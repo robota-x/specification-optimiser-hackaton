@@ -368,8 +368,8 @@ Key metrics to monitor:
 ## Cost Estimates
 
 **Per Analysis:**
-- Gemini API (gemini-1.5-flash): ~$0.01 for extraction
-- Gemini API (gemini-1.5-pro): ~$0.05 for report generation
+- Gemini API (gemini-2.5-flash-lite): ~$0.01 for extraction
+- Gemini API (gemini-2.5-flash): ~$0.05 for report generation
 - Supabase: Minimal (< $0.001)
 
 **Total**: ~$0.06 per analysis
