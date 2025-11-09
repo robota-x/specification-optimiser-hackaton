@@ -84,7 +84,7 @@ The Architectural Specification AI Green Optimiser is a web-based platform for c
 
 **Key Components:**
 - `ESGReport` component with real-time job tracking
-- Edge functions: `initiate-project-analysis`, `run-analysis-job`, `gemini-chat`
+- Edge functions: `initiate-project-analysis`, `run-analysis-job`, `llm-wrapper`
 - Database: `esg_material_library`, `product_library`, `project_analysis_job`, `project_esg_suggestion`
 - Type guards: `hasSelectedProduct()`, `getSelectedProductId()`
 
@@ -262,7 +262,7 @@ The Architectural Specification AI Green Optimiser is a web-based platform for c
 **Edge Functions:**
 - `initiate-project-analysis` - Create analysis job
 - `run-analysis-job` - Execute Hybrid Analysis
-- `gemini-chat` - LLM wrapper with rate limiting (10/min, 100/hr)
+- `llm-wrapper` - LLM wrapper with global rate limiting (60/min, 1000/hr) and request logging
 
 ---
 

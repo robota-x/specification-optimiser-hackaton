@@ -20,10 +20,10 @@ import { useMasterLibrary } from '@/hooks/useV2MasterLibrary';
 import { ProjectNavigator } from '@/components/v2/ProjectNavigator';
 import { MasterLibraryBrowser } from '@/components/v2/MasterLibraryBrowser';
 import { ClauseEditor } from '@/components/v2/ClauseEditor';
-import { V2ProjectPrintView } from '@/components/v2/V2ProjectPrintView';
 import { ESGReport } from '@/components/esg';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ProjectClauseFull } from '@/types/v2-schema';
+import { openPrintDialog } from '@/utils/printDocument';
 
 export default function V2SpecEditor() {
   const { id } = useParams<{ id: string }>();
@@ -128,7 +128,7 @@ export default function V2SpecEditor() {
     if (!project) return;
 
     try {
-      window.print();
+      openPrintDialog(project, clauses);
       toast({
         title: 'PDF Export',
         description: 'Opening print dialog...',
@@ -263,14 +263,6 @@ export default function V2SpecEditor() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Print view for PDF generation */}
-      {project && (
-        <V2ProjectPrintView
-          project={project}
-          clauses={clauses}
-        />
-      )}
     </div>
   );
 }
