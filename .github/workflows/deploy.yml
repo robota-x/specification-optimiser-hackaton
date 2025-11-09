@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
+    # Allows manual triggering from any branch for testing
 
 jobs:
   build:
