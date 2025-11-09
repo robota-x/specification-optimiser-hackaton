@@ -86,6 +86,7 @@ export function V2ProjectPrintView({ project, clauses, onReady }: V2ProjectPrint
         {/* Clauses */}
         {clauses.map((clause, index) => {
           let renderedClause;
+          let renderError: string | null = null;
 
           try {
             if (isHybridClause(clause) && clause.master_clause) {
@@ -93,31 +94,50 @@ export function V2ProjectPrintView({ project, clauses, onReady }: V2ProjectPrint
             } else if (isFreeformClause(clause)) {
               renderedClause = renderProjectClause(clause);
             } else {
-              return null;
+              // Neither hybrid nor freeform - data integrity issue
+              renderError = 'Invalid clause type: missing master_clause_id and freeform fields';
+              console.error('Invalid clause type:', clause);
             }
           } catch (error) {
-            console.error('Error rendering clause:', error);
-            return null;
+            renderError = error instanceof Error ? error.message : 'Unknown error rendering clause';
+            console.error('Error rendering clause:', error, clause);
+          }
+
+          // Show error state for failed clauses
+          if (renderError) {
+            return (
+              <div key={clause.project_clause_id} className="mb-8 print:break-inside-avoid">
+                <div className="border-2 border-destructive rounded-lg p-4 bg-destructive/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-destructive font-semibold">⚠ Error Rendering Clause</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Clause ID: {clause.project_clause_id}
+                  </p>
+                  <p className="text-sm text-destructive mt-1">{renderError}</p>
+                </div>
+              </div>
+            );
           }
 
           return (
             <div key={clause.project_clause_id} className="mb-8 print:break-inside-avoid">
               <div className="mb-2">
                 <span className="text-sm font-mono text-muted-foreground">
-                  {renderedClause.caws_number}
+                  {renderedClause!.caws_number}
                 </span>
               </div>
 
-              <h2 className="text-2xl font-bold mb-3">{renderedClause.title}</h2>
+              <h2 className="text-2xl font-bold mb-3">{renderedClause!.title}</h2>
 
               <div className="prose max-w-none whitespace-pre-wrap">
-                {renderedClause.body}
+                {renderedClause!.body}
               </div>
 
-              {renderedClause.notes && (
+              {renderedClause!.notes && (
                 <div className="mt-3 p-3 bg-muted rounded text-sm">
                   <span className="font-semibold">Notes: </span>
-                  {renderedClause.notes}
+                  {renderedClause!.notes}
                 </div>
               )}
             </div>

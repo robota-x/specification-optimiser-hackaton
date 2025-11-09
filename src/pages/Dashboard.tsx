@@ -161,7 +161,7 @@ const Dashboard = () => {
               <Card
                 key={project.project_id}
                 className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/v2/spec/${project.project_id}`)}
+                onClick={() => navigate(`/spec/${project.project_id}`)}
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

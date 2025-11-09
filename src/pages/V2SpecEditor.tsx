@@ -81,6 +81,20 @@ export default function V2SpecEditor() {
     }
   }, [clauses, selectedClauseId]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+S to save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [projectName, projectDescription]);
+
   const handleSave = async () => {
     if (!project) return;
 

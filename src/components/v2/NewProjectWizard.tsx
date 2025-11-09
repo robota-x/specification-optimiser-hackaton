@@ -3,11 +3,12 @@
  * Implements the "Preliminaries Wizard" from the implementation doc
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useContractTypes, usePreliminariesClauses } from '@/hooks/useV2MasterLibrary';
 import { useCreateProject } from '@/hooks/useV2Projects';
+import { getUserOrganisationId } from '@/lib/services/organisation.service';
 import {
   Dialog,
   DialogContent,
@@ -27,9 +28,6 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import type { ProjectInsert, FieldValues } from '@/types/v2-schema';
-
-// Default organisation ID from seed data
-const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
 
 interface NewProjectWizardProps {
   open: boolean;
@@ -55,6 +53,7 @@ export function NewProjectWizard({ open, onOpenChange }: NewProjectWizardProps) 
   const { toast } = useToast();
 
   const [step, setStep] = useState<WizardStep>('details');
+  const [organisationId, setOrganisationId] = useState<string>('');
   const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
     description: '',
@@ -75,6 +74,13 @@ export function NewProjectWizard({ open, onOpenChange }: NewProjectWizardProps) 
 
   // Mutations
   const createProject = useCreateProject();
+
+  // Load user's organisation on mount
+  useEffect(() => {
+    if (open) {
+      getUserOrganisationId().then(setOrganisationId);
+    }
+  }, [open]);
 
   const handleNext = () => {
     if (step === 'details') {
@@ -115,9 +121,18 @@ export function NewProjectWizard({ open, onOpenChange }: NewProjectWizardProps) 
       return;
     }
 
+    if (!organisationId) {
+      toast({
+        title: 'Error',
+        description: 'Organisation not loaded',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const projectData: ProjectInsert = {
-        organisation_id: DEFAULT_ORG_ID,
+        organisation_id: organisationId,
         user_id: '', // Will be set by service
         name: formData.name,
         description: formData.description || null,
@@ -133,7 +148,7 @@ export function NewProjectWizard({ open, onOpenChange }: NewProjectWizardProps) 
 
       const newProject = await createProject.mutateAsync({
         projectData,
-        organisationId: DEFAULT_ORG_ID,
+        organisationId,
       });
 
       toast({
@@ -143,7 +158,7 @@ export function NewProjectWizard({ open, onOpenChange }: NewProjectWizardProps) 
 
       // Close wizard and navigate to editor
       onOpenChange(false);
-      navigate(`/v2/spec/${newProject.project_id}`);
+      navigate(`/spec/${newProject.project_id}`);
 
       // Reset form for next time
       setFormData({

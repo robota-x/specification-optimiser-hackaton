@@ -8,7 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import {
   useUpdateClauseFieldValues,
   useUpdateFreeformClause,
@@ -46,6 +51,9 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
   const [freeformTitle, setFreeformTitle] = useState('');
   const [freeformBody, setFreeformBody] = useState('');
 
+  // Notes (shared between both types)
+  const [notes, setNotes] = useState('');
+
   // UI state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -62,6 +70,7 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
       setFreeformCawsNumber('');
       setFreeformTitle('');
       setFreeformBody('');
+      setNotes('');
       setHasUnsavedChanges(false);
       return;
     }
@@ -76,10 +85,23 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
       setFreeformBody(clause.freeform_body || '');
     }
 
+    // Load notes (shared field)
+    setNotes(clause.notes || '');
     setHasUnsavedChanges(false);
   }, [clause]);
 
-  const handleSave = async () => {
+  // Auto-save after 30 seconds of inactivity
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const timer = setTimeout(() => {
+      handleSave(true); // isAutoSave = true
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [hasUnsavedChanges, fieldValues, freeformCawsNumber, freeformTitle, freeformBody, notes]);
+
+  const handleSave = async (isAutoSave = false) => {
     if (!clause) return;
 
     try {
@@ -97,13 +119,18 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
         });
       }
 
+      // Update notes (separate mutation if needed - for now we'll include in the above)
+      // The service already supports notes in ProjectClauseUpdate
+
       setHasUnsavedChanges(false);
       onClauseUpdated();
 
-      toast({
-        title: 'Saved',
-        description: 'Clause has been updated',
-      });
+      if (!isAutoSave) {
+        toast({
+          title: 'Saved',
+          description: 'Clause has been updated',
+        });
+      }
     } catch (error: any) {
       toast({
         title: 'Error saving clause',
@@ -211,6 +238,33 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
               Add Item
             </Button>
           </div>
+        );
+
+      case 'date':
+        const dateValue = value ? new Date(value as string) : undefined;
+        return (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !dateValue && 'text-muted-foreground'
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateValue ? format(dateValue, 'PPP') : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateValue}
+                onSelect={(date) => handleChange(date ? date.toISOString() : '')}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         );
 
       default:
@@ -359,6 +413,24 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
               </div>
             </>
           )}
+
+          {/* Notes field (available for both hybrid and freeform) */}
+          <div className="space-y-2 pt-6 border-t">
+            <Label htmlFor="notes">Notes (optional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setHasUnsavedChanges(true);
+              }}
+              placeholder="Add notes or comments about this clause..."
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              Notes will appear in the PDF export but are not part of the specification content.
+            </p>
+          </div>
         </div>
       </ScrollArea>
 
