@@ -39,6 +39,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpecPrintView } from "@/components/pdf/SpecPrintView";
 import { useSpecPDF } from "@/hooks/useSpecPDF";
+import { ESGReport } from "@/components/esg";
+import { initiateProjectAnalysis } from "@/lib/services/esg.service";
 
 interface Spec {
   id: string;
@@ -219,6 +221,22 @@ const SpecEditor = () => {
           title: "Saved!",
           description: "Specification has been updated.",
         });
+
+        // Trigger ESG analysis in the background (non-blocking)
+        try {
+          initiateProjectAnalysis(spec.id).then(() => {
+            toast({
+              title: "ESG Analysis Started",
+              description: "Running ESG analysis in the background...",
+            });
+          }).catch((error) => {
+            console.error('Failed to initiate ESG analysis:', error);
+            // Don't show error to user - this is a background process
+          });
+        } catch (error) {
+          console.error('Failed to trigger ESG analysis:', error);
+          // Don't fail the save if ESG analysis fails to trigger
+        }
       }
     } catch (error: any) {
       toast({
@@ -568,40 +586,53 @@ const SpecEditor = () => {
         {/* Main content */}
         <main className="flex-1 overflow-auto">
           <div className="container mx-auto px-6 py-8 max-w-5xl">
-            <div className="mb-8">
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Description
-              </label>
-              <Input
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  setHasUnsavedChanges(true);
-                }}
-                placeholder="Brief description of this specification"
-                maxLength={500}
-              />
-            </div>
+            <Tabs defaultValue="editor" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="editor">Editor</TabsTrigger>
+                <TabsTrigger value="esg">ESG Analysis</TabsTrigger>
+              </TabsList>
 
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Content Blocks</h2>
-              {!sidebarOpen && (
-                <Button onClick={() => setSidebarOpen(true)} size="sm">
-                  <Library className="h-4 w-4 mr-2" />
-                  Open Library
-                </Button>
-              )}
-            </div>
+              <TabsContent value="editor" className="mt-0">
+                <div className="mb-8">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Description
+                  </label>
+                  <Input
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      setHasUnsavedChanges(true);
+                    }}
+                    placeholder="Brief description of this specification"
+                    maxLength={500}
+                  />
+                </div>
 
-            <SortableBlockList
-              blocks={blocks}
-              expandedBlocks={expandedBlocks}
-              onToggleExpand={handleToggleExpand}
-              onReorder={handleReorderBlocks}
-              onDelete={handleDeleteBlock}
-              onUpdateValues={handleUpdateBlockValues}
-              blockValues={blockValues}
-            />
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Content Blocks</h2>
+                  {!sidebarOpen && (
+                    <Button onClick={() => setSidebarOpen(true)} size="sm">
+                      <Library className="h-4 w-4 mr-2" />
+                      Open Library
+                    </Button>
+                  )}
+                </div>
+
+                <SortableBlockList
+                  blocks={blocks}
+                  expandedBlocks={expandedBlocks}
+                  onToggleExpand={handleToggleExpand}
+                  onReorder={handleReorderBlocks}
+                  onDelete={handleDeleteBlock}
+                  onUpdateValues={handleUpdateBlockValues}
+                  blockValues={blockValues}
+                />
+              </TabsContent>
+
+              <TabsContent value="esg" className="mt-0">
+                {spec && <ESGReport projectId={spec.id} />}
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
