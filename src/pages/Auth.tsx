@@ -84,27 +84,28 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
+  // Google Sign-In - DISABLED (commented out)
+  // const handleGoogleSignIn = async () => {
+  //   setLoading(true);
 
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
+  //   try {
+  //     const { error } = await supabase.auth.signInWithOAuth({
+  //       provider: 'google',
+  //       options: {
+  //         redirectTo: `${window.location.origin}/dashboard`,
+  //       },
+  //     });
 
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
+  //     if (error) throw error;
+  //   } catch (error: any) {
+  //     toast({
+  //       title: "Error",
+  //       description: error.message,
+  //       variant: "destructive",
+  //     });
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20 p-4">
@@ -164,7 +165,8 @@ const Auth = () => {
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
-              <div className="relative my-6">
+              {/* Google Sign-In - DISABLED (commented out) */}
+              {/* <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-border" />
                 </div>
@@ -200,7 +202,7 @@ const Auth = () => {
                   />
                 </svg>
                 Continue with Google
-              </Button>
+              </Button> */}
             </TabsContent>
             <TabsContent value="signup" className="mt-0">
               <form onSubmit={handleSignUp} className="space-y-5">
