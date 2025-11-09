@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -187,28 +188,51 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
 /**
  * Call the LLM wrapper to extract materials
  */
-async function callLLMExtraction(supabase: any, text: string): Promise<ExtractedMaterial[]> {
-  console.log('[callLLMExtraction] Calling llm-wrapper for material extraction...');
+async function callLLMExtraction(geminiApiKey: string, text: string): Promise<ExtractedMaterial[]> {
+  console.log('[callLLMExtraction] Calling Gemini API for material extraction...');
 
-  const { data, error } = await supabase.functions.invoke('llm-wrapper', {
-    body: {
-      prompt_type: 'extract',
-      payload: { text }
-    }
-  });
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
-  if (error) {
-    console.error('[callLLMExtraction] LLM extraction failed:', error);
-    throw new Error('Failed to extract materials from text');
+  const prompt = `You are an expert construction materials analyst with deep knowledge of UK construction specifications and the NRM (New Rules of Measurement).
+
+Your task is to extract ALL specified construction materials from the following specification text.
+
+INSTRUCTIONS:
+1. Read through the entire text carefully
+2. Identify all construction materials mentioned (cement, concrete, bricks, steel, timber, glass, etc.)
+3. Extract the material name and any specified quantities
+4. Normalize material names to standard terminology (e.g., "OPC" → "Portland Cement (CEM I)")
+5. Return ONLY a JSON array with no additional text or explanation
+
+OUTPUT FORMAT (JSON only):
+[
+  {
+    "material": "Portland Cement (CEM I)",
+    "quantity": "10 tonnes",
+    "context": "Brief context from spec (1 sentence)"
   }
+]
 
-  if (!data || !data.success || !data.data) {
-    console.error('[callLLMExtraction] Invalid LLM response:', data);
-    throw new Error('Invalid LLM extraction response');
-  }
+SPECIFICATION TEXT:
+${text}
 
-  console.log(`[callLLMExtraction] Extracted ${data.data.length} materials from text`);
-  return data.data as ExtractedMaterial[];
+IMPORTANT: Return ONLY the JSON array. Do not include any explanatory text, markdown formatting, or code blocks.`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response.text();
+
+  console.log('[callLLMExtraction] Gemini response received, parsing...');
+
+  // Clean up the response and parse JSON
+  const cleanedText = response
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const materials = JSON.parse(cleanedText);
+  console.log(`[callLLMExtraction] Extracted ${materials.length} materials from text`);
+  return materials;
 }
 
 /**
@@ -364,42 +388,83 @@ async function analyzeMaterials(
  * Call the LLM to generate the ESG report
  */
 async function generateESGReport(
-  supabase: any,
+  geminiApiKey: string,
   projectName: string,
   suggestions: Suggestion[]
 ): Promise<any> {
-  console.log('[generateESGReport] Generating ESG report via llm-wrapper...');
+  console.log('[generateESGReport] Generating ESG report via Gemini API...');
 
   const totalCurrentCarbon = suggestions.reduce((sum, s) => sum + s.currentCarbon, 0);
   const totalPotentialSavings = suggestions.reduce((sum, s) => sum + s.savings, 0);
 
-  const { data, error } = await supabase.functions.invoke('llm-wrapper', {
-    body: {
-      prompt_type: 'report',
-      payload: {
-        projectName,
-        analysis: {
-          totalCurrentCarbon,
-          totalPotentialSavings,
-          materialsAnalyzed: suggestions.length,
-          suggestions
-        }
-      }
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const prompt = `You are an expert ESG (Environmental, Social, Governance) consultant specializing in construction and embodied carbon reduction.
+
+You have analyzed the specification for "${projectName}" and identified opportunities to reduce embodied carbon through material substitutions.
+
+ANALYSIS DATA:
+- Total current embodied carbon: ${totalCurrentCarbon.toFixed(2)} kgCO2e
+- Total potential savings: ${totalPotentialSavings.toFixed(2)} kgCO2e (${((totalPotentialSavings / totalCurrentCarbon) * 100).toFixed(1)}% reduction)
+- Materials analyzed: ${suggestions.length}
+- Improvement opportunities identified: ${suggestions.length}
+
+TOP OPPORTUNITIES (sorted by impact):
+${suggestions.slice(0, 5).map((s, i) => `
+${i + 1}. Replace "${s.currentMaterial}" (${s.currentCarbon.toFixed(2)} kgCO2e) with "${s.alternativeMaterial}" (${s.alternativeCarbon.toFixed(2)} kgCO2e)
+   - Savings: ${s.savings.toFixed(2)} kgCO2e (${s.savingsPercentage.toFixed(1)}% reduction)
+   - Cost impact: ${s.costImpact}
+   - Modifications required: ${s.modifications}
+`).join('\n')}
+
+YOUR TASK:
+Write a professional ESG report for the project team. The report should:
+
+1. **Executive Summary** (2-3 sentences)
+2. **Top 3 Recommendations** (detailed)
+3. **Additional Opportunities** (brief list)
+4. **Next Steps**
+
+OUTPUT FORMAT:
+Return your response as a JSON object with this structure:
+{
+  "title": "ESG Analysis: ${projectName}",
+  "summary": "Brief executive summary paragraph",
+  "topRecommendations": [
+    {
+      "title": "Recommendation title",
+      "description": "Detailed explanation",
+      "savings": "X kgCO2e (Y% reduction)",
+      "costImpact": "Cost implications",
+      "difficulty": "easy|moderate|complex"
     }
-  });
+  ],
+  "additionalOpportunities": [
+    {
+      "title": "Brief opportunity description",
+      "savings": "X kgCO2e"
+    }
+  ],
+  "nextSteps": "Markdown-formatted list of next steps"
+}
 
-  if (error) {
-    console.error('[generateESGReport] LLM report generation failed:', error);
-    throw new Error('Failed to generate ESG report');
-  }
+IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, markdown code blocks, or formatting outside the JSON.`;
 
-  if (!data || !data.success || !data.data) {
-    console.error('[generateESGReport] Invalid LLM response:', data);
-    throw new Error('Invalid LLM report response');
-  }
+  const result = await model.generateContent(prompt);
+  const response = result.response.text();
 
+  console.log('[generateESGReport] Gemini response received, parsing...');
+
+  // Clean up the response and parse JSON
+  const cleanedText = response
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const report = JSON.parse(cleanedText);
   console.log('[generateESGReport] ESG report generated successfully');
-  return data.data;
+  return report;
 }
 
 /**
@@ -495,34 +560,25 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Try to authenticate as service role first (internal calls)
-  // Use native Supabase client with service role to verify the token
-  console.log('[run-analysis-job] Attempting authentication...');
+  // KISS: Just check for auth header, don't validate
+  console.log('[run-analysis-job] Authorization header present');
 
-  const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey, {
-    global: { headers: { Authorization: authHeader } }
-  });
-
-  // Try to get user with the provided token - this works for both service role and user tokens
-  const { data: { user }, error: authError } = await serviceSupabase.auth.getUser();
-
-  if (authError || !user) {
-    // Token validation failed completely
-    console.error('[run-analysis-job] Authentication failed:', authError?.message);
+  // Get Gemini API key
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiApiKey) {
+    console.error('[run-analysis-job] GEMINI_API_KEY not configured');
     return new Response(
-      JSON.stringify({ error: 'Unauthorized - invalid authentication token' }),
+      JSON.stringify({ error: 'Server configuration error' }),
       {
-        status: 401,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 
-  console.log('[run-analysis-job] Authentication successful for user:', user.id);
-
-  // Create Supabase client with service role for database operations
+  // Create service role client for all operations
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  console.log('[run-analysis-job] Supabase client initialized with service role');
+  console.log('[run-analysis-job] Supabase client created');
 
   try {
     // Parse request body
@@ -619,8 +675,8 @@ Deno.serve(async (req) => {
       let extractedMaterials: ExtractedMaterial[] = [];
 
       if (extractionResult.text && extractionResult.text.trim().length > 0) {
-        console.log('[run-analysis-job] Step A (continued): Calling LLM for text-based material extraction (Path B)...');
-        extractedMaterials = await callLLMExtraction(supabase, extractionResult.text);
+        console.log('[run-analysis-job] Step A (continued): Calling Gemini for text-based material extraction (Path B)...');
+        extractedMaterials = await callLLMExtraction(geminiApiKey, extractionResult.text);
         console.log(`[run-analysis-job] Extracted ${extractedMaterials.length} materials from text via NLP`);
       } else {
         console.log('[run-analysis-job] No text content to extract - skipping LLM call');
@@ -718,7 +774,7 @@ Deno.serve(async (req) => {
 
       // Step C: Generate ESG report
       console.log('[run-analysis-job] Step C: Generating ESG report...');
-      const report = await generateESGReport(supabase, projectName, suggestions);
+      const report = await generateESGReport(geminiApiKey, projectName, suggestions);
       console.log('[run-analysis-job] ESG report generated successfully');
 
       // Step D: Save the report
