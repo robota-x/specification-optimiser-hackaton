@@ -56,6 +56,51 @@ export async function initiateProjectAnalysis(projectId: string): Promise<{
 }
 
 /**
+ * Cancel current analysis and retry from scratch
+ * This marks any running/queued jobs as 'failed', deletes partial results, and starts fresh
+ */
+export async function cancelAndRetryAnalysis(projectId: string): Promise<{
+  success: boolean;
+  job_id: string;
+  status: string;
+  message: string;
+}> {
+  try {
+    // Mark any existing running/queued jobs as failed
+    const { error: cancelError } = await supabase
+      .from('project_analysis_job')
+      .update({
+        status: 'failed',
+        error_message: 'Cancelled by user'
+      })
+      .eq('project_id', projectId)
+      .in('status', ['queued', 'running']);
+
+    if (cancelError) {
+      console.error('Error cancelling existing jobs:', cancelError);
+      throw cancelError;
+    }
+
+    // Delete any partial ESG suggestions
+    const { error: deleteError } = await supabase
+      .from('project_esg_suggestion')
+      .delete()
+      .eq('project_id', projectId);
+
+    if (deleteError) {
+      console.error('Error deleting partial suggestions:', deleteError);
+      // Don't throw - we can proceed even if deletion fails
+    }
+
+    // Start a fresh analysis
+    return await initiateProjectAnalysis(projectId);
+  } catch (error) {
+    console.error('Failed to cancel and retry analysis:', error);
+    throw error;
+  }
+}
+
+/**
  * Get the latest analysis job for a project
  */
 export async function getLatestAnalysisJob(projectId: string): Promise<ProjectAnalysisJob | null> {

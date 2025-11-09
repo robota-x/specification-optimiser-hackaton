@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SuggestionCard } from './SuggestionCard';
@@ -15,6 +15,7 @@ import {
   subscribeToAnalysisJob,
   subscribeToESGSuggestions,
   initiateProjectAnalysis,
+  cancelAndRetryAnalysis,
   getAnalysisStatusMessage,
 } from '@/lib/services/esg.service';
 import type { ProjectAnalysisJob, ProjectESGSuggestion } from '@/types/v2-schema';
@@ -28,14 +29,16 @@ export function ESGReport({ projectId }: ESGReportProps) {
   const [suggestion, setSuggestion] = useState<ProjectESGSuggestion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitiating, setIsInitiating] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Load initial data
   useEffect(() => {
     loadData();
   }, [projectId]);
 
-  // Subscribe to real-time updates
+  // Subscribe to real-time updates + fallback polling
   useEffect(() => {
     // Subscribe to analysis job updates
     const unsubscribeJob = subscribeToAnalysisJob(projectId, (job) => {
@@ -57,12 +60,32 @@ export function ESGReport({ projectId }: ESGReportProps) {
       }
     });
 
+    // Fallback polling every 5 seconds when job is running
+    const pollInterval = setInterval(async () => {
+      if (analysisJob?.status === 'running' || analysisJob?.status === 'queued') {
+        console.log('Polling for job status update...');
+        try {
+          const job = await getLatestAnalysisJob(projectId);
+          if (job && job.status !== analysisJob.status) {
+            console.log('Job status changed via polling:', job.status);
+            setAnalysisJob(job);
+            if (job.status === 'complete') {
+              loadSuggestion();
+            }
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }
+    }, 5000);
+
     // Cleanup subscriptions on unmount
     return () => {
       unsubscribeJob();
       unsubscribeSuggestion();
+      clearInterval(pollInterval);
     };
-  }, [projectId]);
+  }, [projectId, analysisJob?.status]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -95,6 +118,7 @@ export function ESGReport({ projectId }: ESGReportProps) {
   const handleRunAnalysis = async () => {
     setIsInitiating(true);
     setError(null);
+    setElapsedSeconds(0);
 
     try {
       const result = await initiateProjectAnalysis(projectId);
@@ -109,6 +133,48 @@ export function ESGReport({ projectId }: ESGReportProps) {
       setIsInitiating(false);
     }
   };
+
+  const handleStopAndRetry = async () => {
+    setIsRetrying(true);
+    setError(null);
+    setElapsedSeconds(0);
+
+    try {
+      const result = await cancelAndRetryAnalysis(projectId);
+      console.log('Analysis cancelled and retried:', result);
+
+      // Reload the analysis job status
+      await loadData();
+    } catch (err) {
+      console.error('Failed to cancel and retry analysis:', err);
+      setError('Failed to reset analysis. Please try again.');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // Timer for elapsed time tracking
+  useEffect(() => {
+    const isRunning = analysisJob?.status === 'queued' || analysisJob?.status === 'running';
+
+    if (!isRunning) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    // Calculate initial elapsed time based on job created_at
+    const startTime = analysisJob.created_at ? new Date(analysisJob.created_at).getTime() : Date.now();
+    const initialElapsed = Math.floor((Date.now() - startTime) / 1000);
+    setElapsedSeconds(initialElapsed);
+
+    // Update every second
+    const interval = setInterval(() => {
+      const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+      setElapsedSeconds(currentElapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [analysisJob?.status, analysisJob?.created_at]);
 
   // Render loading state
   if (isLoading) {
@@ -135,6 +201,17 @@ export function ESGReport({ projectId }: ESGReportProps) {
   const isRunning = analysisJob?.status === 'queued' || analysisJob?.status === 'running';
   const hasFailed = analysisJob?.status === 'failed';
   const hasCompleted = analysisJob?.status === 'complete';
+  const showWarning = isRunning && elapsedSeconds > 30;
+
+  // Format elapsed time
+  const formatElapsedTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
 
   return (
     <div className="space-y-6">
@@ -146,41 +223,73 @@ export function ESGReport({ projectId }: ESGReportProps) {
             AI-powered carbon reduction opportunities for your specification
           </p>
         </div>
-        <Button
-          onClick={handleRunAnalysis}
-          disabled={isRunning || isInitiating}
-          variant={hasCompleted ? 'outline' : 'default'}
-        >
-          {isInitiating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Starting...
-            </>
-          ) : isRunning ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {hasCompleted ? 'Re-run Analysis' : 'Run Analysis'}
-            </>
+        <div className="flex items-center gap-2">
+          {isRunning && (
+            <Button
+              onClick={handleStopAndRetry}
+              disabled={isRetrying}
+              variant="outline"
+              size="sm"
+            >
+              {isRetrying ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <XCircle className="mr-2 h-3 w-3" />
+                  Stop & Retry
+                </>
+              )}
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={handleRunAnalysis}
+            disabled={isRunning || isInitiating}
+            variant={hasCompleted ? 'outline' : 'default'}
+          >
+            {isInitiating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Starting...
+              </>
+            ) : isRunning ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing... ({formatElapsedTime(elapsedSeconds)})
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {hasCompleted ? 'Re-run Analysis' : 'Run Analysis'}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Status alerts */}
       {isRunning && (
-        <Alert>
+        <Alert variant={showWarning ? 'destructive' : 'default'}>
           <Loader2 className="h-4 w-4 animate-spin" />
-          <AlertTitle>Analysis in Progress</AlertTitle>
+          <AlertTitle>
+            {showWarning ? 'Analysis Taking Longer Than Expected' : 'Analysis in Progress'}
+          </AlertTitle>
           <AlertDescription>
             {getAnalysisStatusMessage(analysisJob)}
+            {' '}
+            (Elapsed: {formatElapsedTime(elapsedSeconds)})
             <br />
-            <span className="text-xs text-muted-foreground mt-1 block">
-              This may take 1-2 minutes. The page will update automatically when complete.
-            </span>
+            {showWarning ? (
+              <span className="text-xs mt-1 block font-medium">
+                This is taking longer than usual. Try using the "Stop & Retry" button to reset the analysis.
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground mt-1 block">
+                This may take 1-2 minutes. The page will update automatically when complete.
+              </span>
+            )}
           </AlertDescription>
         </Alert>
       )}

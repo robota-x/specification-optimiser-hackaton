@@ -28,7 +28,7 @@ BEGIN
         -- Castle Cement - CEM II/B-V (PFA) - Medium-carbon option
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000010',
+            '60000000-0000-0000-0000-000000000036',
             v_master_clause_id,
             'Castle Cement',
             'Eurocem PFA',
@@ -55,7 +55,7 @@ BEGIN
         -- Tarmac - Virgin Limestone Aggregates (baseline)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000011',
+            '60000000-0000-0000-0000-000000000037',
             v_master_clause_id,
             'Tarmac',
             'Premium Limestone Aggregates',
@@ -66,7 +66,7 @@ BEGIN
         -- Hanson - Mixed Virgin/Recycled (mid-range)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000012',
+            '60000000-0000-0000-0000-000000000038',
             v_master_clause_id,
             'Hanson',
             'EcoMix Aggregates',
@@ -77,7 +77,7 @@ BEGIN
         -- CEMEX - High Recycled Content (green option)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000013',
+            '60000000-0000-0000-0000-000000000039',
             v_master_clause_id,
             'CEMEX',
             'ReConcrete Aggregate',
@@ -88,7 +88,7 @@ BEGIN
         -- Aggregate Industries - Granite (high strength)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000014',
+            '60000000-0000-0000-0000-00000000003a',
             v_master_clause_id,
             'Aggregate Industries',
             'Granite Premium Grade',
@@ -115,7 +115,7 @@ BEGIN
         -- Sika - Standard Superplasticizer
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000015',
+            '60000000-0000-0000-0000-00000000003b',
             v_master_clause_id,
             'Sika',
             'ViscoCrete-20 HE',
@@ -126,7 +126,7 @@ BEGIN
         -- BASF - High Performance
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000016',
+            '60000000-0000-0000-0000-00000000003c',
             v_master_clause_id,
             'BASF',
             'MasterGlenium ACE 430',
@@ -137,7 +137,7 @@ BEGIN
         -- Chryso - Bio-based (green option)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000017',
+            '60000000-0000-0000-0000-00000000003d',
             v_master_clause_id,
             'Chryso',
             'Optima Bio 4000',
@@ -148,7 +148,7 @@ BEGIN
         -- Fosroc - Standard Plasticizer
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000018',
+            '60000000-0000-0000-0000-00000000003e',
             v_master_clause_id,
             'Fosroc',
             'Conplast SP337',
@@ -181,7 +181,7 @@ BEGIN
         -- Reclaimed Brick Company - Reclaimed Bricks (green option)
         INSERT INTO product_library (product_id, master_clause_id, manufacturer, product_name, product_data)
         VALUES (
-            '60000000-0000-0000-0000-000000000019',
+            '60000000-0000-0000-0000-00000000003f',
             v_master_clause_id,
             'Reclaimed Brick Company',
             'Victorian Red Stock',

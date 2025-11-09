@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,19 +80,19 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
     .from('project_clause')
     .select(`
       project_clause_id,
-      caws_number,
+      freeform_caws_number,
       field_values,
       freeform_body,
+      freeform_title,
       master_clause_id,
       master_clause (
         caws_number,
-        short_title,
+        title,
         body_template,
         field_definitions
       )
     `)
-    .eq('project_id', projectId)
-    .eq('is_active', true);
+    .eq('project_id', projectId);
 
   if (error) {
     console.error('Error fetching project clauses:', error);
@@ -110,8 +111,9 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
   const extractedProducts: ExtractedProduct[] = [];
 
   for (const clause of clauses) {
-    // Add CAWS number and context
-    textParts.push(`\n--- CLAUSE ${clause.caws_number} ---`);
+    // Get CAWS number - from master_clause for hybrid, or freeform_caws_number for freeform
+    const cawsNumber = clause.master_clause?.caws_number || clause.freeform_caws_number || 'UNKNOWN';
+    textParts.push(`\n--- CLAUSE ${cawsNumber} ---`);
 
     if (clause.master_clause_id && clause.master_clause) {
       // Hybrid clause - check for product selection FIRST (Path A - Easy)
@@ -146,7 +148,7 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
       }
 
       // Then build text for NLP extraction (Path B - Hard)
-      textParts.push(`Title: ${clause.master_clause.short_title}`);
+      textParts.push(`Title: ${clause.master_clause.title}`);
 
       let renderedText = clause.master_clause.body_template || '';
 
@@ -186,34 +188,51 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
 /**
  * Call the LLM wrapper to extract materials
  */
-async function callLLMExtraction(supabaseUrl: string, serviceKey: string, text: string): Promise<ExtractedMaterial[]> {
-  const llmUrl = `${supabaseUrl}/functions/v1/llm-wrapper`;
+async function callLLMExtraction(geminiApiKey: string, text: string): Promise<ExtractedMaterial[]> {
+  console.log('[callLLMExtraction] Calling Gemini API for material extraction...');
 
-  const response = await fetch(llmUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`
-    },
-    body: JSON.stringify({
-      prompt_type: 'extract',
-      payload: { text }
-    })
-  });
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('LLM extraction failed:', errorText);
-    throw new Error('Failed to extract materials from text');
+  const prompt = `You are an expert construction materials analyst with deep knowledge of UK construction specifications and the NRM (New Rules of Measurement).
+
+Your task is to extract ALL specified construction materials from the following specification text.
+
+INSTRUCTIONS:
+1. Read through the entire text carefully
+2. Identify all construction materials mentioned (cement, concrete, bricks, steel, timber, glass, etc.)
+3. Extract the material name and any specified quantities
+4. Normalize material names to standard terminology (e.g., "OPC" → "Portland Cement (CEM I)")
+5. Return ONLY a JSON array with no additional text or explanation
+
+OUTPUT FORMAT (JSON only):
+[
+  {
+    "material": "Portland Cement (CEM I)",
+    "quantity": "10 tonnes",
+    "context": "Brief context from spec (1 sentence)"
   }
+]
 
-  const result = await response.json();
+SPECIFICATION TEXT:
+${text}
 
-  if (!result.success || !result.data) {
-    throw new Error('Invalid LLM extraction response');
-  }
+IMPORTANT: Return ONLY the JSON array. Do not include any explanatory text, markdown formatting, or code blocks.`;
 
-  return result.data as ExtractedMaterial[];
+  const result = await model.generateContent(prompt);
+  const response = result.response.text();
+
+  console.log('[callLLMExtraction] Gemini response received, parsing...');
+
+  // Clean up the response and parse JSON
+  const cleanedText = response
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const materials = JSON.parse(cleanedText);
+  console.log(`[callLLMExtraction] Extracted ${materials.length} materials from text`);
+  return materials;
 }
 
 /**
@@ -369,49 +388,83 @@ async function analyzeMaterials(
  * Call the LLM to generate the ESG report
  */
 async function generateESGReport(
-  supabaseUrl: string,
-  serviceKey: string,
+  geminiApiKey: string,
   projectName: string,
   suggestions: Suggestion[]
 ): Promise<any> {
+  console.log('[generateESGReport] Generating ESG report via Gemini API...');
+
   const totalCurrentCarbon = suggestions.reduce((sum, s) => sum + s.currentCarbon, 0);
   const totalPotentialSavings = suggestions.reduce((sum, s) => sum + s.savings, 0);
 
-  const llmUrl = `${supabaseUrl}/functions/v1/llm-wrapper`;
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  const response = await fetch(llmUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`
-    },
-    body: JSON.stringify({
-      prompt_type: 'report',
-      payload: {
-        projectName,
-        analysis: {
-          totalCurrentCarbon,
-          totalPotentialSavings,
-          materialsAnalyzed: suggestions.length,
-          suggestions
-        }
-      }
-    })
-  });
+  const prompt = `You are an expert ESG (Environmental, Social, Governance) consultant specializing in construction and embodied carbon reduction.
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('LLM report generation failed:', errorText);
-    throw new Error('Failed to generate ESG report');
-  }
+You have analyzed the specification for "${projectName}" and identified opportunities to reduce embodied carbon through material substitutions.
 
-  const result = await response.json();
+ANALYSIS DATA:
+- Total current embodied carbon: ${totalCurrentCarbon.toFixed(2)} kgCO2e
+- Total potential savings: ${totalPotentialSavings.toFixed(2)} kgCO2e (${((totalPotentialSavings / totalCurrentCarbon) * 100).toFixed(1)}% reduction)
+- Materials analyzed: ${suggestions.length}
+- Improvement opportunities identified: ${suggestions.length}
 
-  if (!result.success || !result.data) {
-    throw new Error('Invalid LLM report response');
-  }
+TOP OPPORTUNITIES (sorted by impact):
+${suggestions.slice(0, 5).map((s, i) => `
+${i + 1}. Replace "${s.currentMaterial}" (${s.currentCarbon.toFixed(2)} kgCO2e) with "${s.alternativeMaterial}" (${s.alternativeCarbon.toFixed(2)} kgCO2e)
+   - Savings: ${s.savings.toFixed(2)} kgCO2e (${s.savingsPercentage.toFixed(1)}% reduction)
+   - Cost impact: ${s.costImpact}
+   - Modifications required: ${s.modifications}
+`).join('\n')}
 
-  return result.data;
+YOUR TASK:
+Write a professional ESG report for the project team. The report should:
+
+1. **Executive Summary** (2-3 sentences)
+2. **Top 3 Recommendations** (detailed)
+3. **Additional Opportunities** (brief list)
+4. **Next Steps**
+
+OUTPUT FORMAT:
+Return your response as a JSON object with this structure:
+{
+  "title": "ESG Analysis: ${projectName}",
+  "summary": "Brief executive summary paragraph",
+  "topRecommendations": [
+    {
+      "title": "Recommendation title",
+      "description": "Detailed explanation",
+      "savings": "X kgCO2e (Y% reduction)",
+      "costImpact": "Cost implications",
+      "difficulty": "easy|moderate|complex"
+    }
+  ],
+  "additionalOpportunities": [
+    {
+      "title": "Brief opportunity description",
+      "savings": "X kgCO2e"
+    }
+  ],
+  "nextSteps": "Markdown-formatted list of next steps"
+}
+
+IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, markdown code blocks, or formatting outside the JSON.`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response.text();
+
+  console.log('[generateESGReport] Gemini response received, parsing...');
+
+  // Clean up the response and parse JSON
+  const cleanedText = response
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const report = JSON.parse(cleanedText);
+  console.log('[generateESGReport] ESG report generated successfully');
+  return report;
 }
 
 /**
@@ -481,21 +534,60 @@ async function saveESGReport(
  * Main handler
  */
 Deno.serve(async (req) => {
+  console.log('[run-analysis-job] Request received:', req.method, req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('[run-analysis-job] CORS preflight request');
     return new Response('ok', { headers: corsHeaders });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+  // Authenticate the request - accept both user tokens and service role
+  const authHeader = req.headers.get('Authorization');
+
+  if (!authHeader) {
+    console.error('[run-analysis-job] Missing authorization header');
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - missing authorization header' }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  // KISS: Just check for auth header, don't validate
+  console.log('[run-analysis-job] Authorization header present');
+
+  // Get Gemini API key
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiApiKey) {
+    console.error('[run-analysis-job] GEMINI_API_KEY not configured');
+    return new Response(
+      JSON.stringify({ error: 'Server configuration error' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  // Create service role client for all operations
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  console.log('[run-analysis-job] Supabase client created');
 
   try {
     // Parse request body
+    console.log('[run-analysis-job] Parsing request body...');
     const requestBody = await req.json() as RunAnalysisRequest;
     const { job_id, project_id } = requestBody;
 
     if (!job_id || !project_id) {
+      console.error('[run-analysis-job] Missing required fields - job_id:', job_id, 'project_id:', project_id);
       return new Response(
         JSON.stringify({ error: 'Missing required fields: job_id, project_id' }),
         {
@@ -505,34 +597,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Starting analysis job ${job_id} for project ${project_id}`);
+    console.log(`[run-analysis-job] Starting analysis job ${job_id} for project ${project_id}`);
 
     // Update job status to running
+    console.log(`[run-analysis-job] Updating job ${job_id} status to 'running'...`);
     await supabase
       .from('project_analysis_job')
       .update({ status: 'running' })
       .eq('job_id', job_id);
+    console.log(`[run-analysis-job] Job ${job_id} status updated to 'running'`);
 
     try {
       // Get project name
+      console.log(`[run-analysis-job] Fetching project ${project_id}...`);
       const { data: project, error: projectError } = await supabase
         .from('project')
-        .select('project_name')
+        .select('name')
         .eq('project_id', project_id)
         .single();
 
       if (projectError || !project) {
+        console.error(`[run-analysis-job] Project not found:`, projectError?.message);
         throw new Error('Project not found');
       }
 
-      const projectName = project.project_name || 'Untitled Project';
+      const projectName = project.name || 'Untitled Project';
+      console.log(`[run-analysis-job] Project name: ${projectName}`);
 
       // Step A: Extract materials from project (both products and text)
-      console.log('Step A: Extracting project content (products + text)...');
+      console.log('[run-analysis-job] Step A: Extracting project content (products + text)...');
       const extractionResult = await extractProjectContent(supabase, project_id);
+      console.log(`[run-analysis-job] Extraction complete - products: ${extractionResult.products.length}, text length: ${extractionResult.text.length}`);
 
       if ((!extractionResult.text || extractionResult.text.trim().length === 0) && extractionResult.products.length === 0) {
-        console.log('No content found in project (no text and no products)');
+        console.log('[run-analysis-job] No content found in project (no text and no products)');
 
         // Create a "no content" report
         await supabase
@@ -571,27 +669,27 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Extracted ${extractionResult.products.length} products and ${extractionResult.text.length} characters of text`);
+      console.log(`[run-analysis-job] Extracted ${extractionResult.products.length} products and ${extractionResult.text.length} characters of text`);
 
       // Step A (continued): Call LLM for text-based material extraction (Path B)
       let extractedMaterials: ExtractedMaterial[] = [];
 
       if (extractionResult.text && extractionResult.text.trim().length > 0) {
-        console.log('Step A: Calling LLM for text-based material extraction (Path B)...');
-        extractedMaterials = await callLLMExtraction(supabaseUrl, supabaseServiceKey, extractionResult.text);
-        console.log(`Extracted ${extractedMaterials.length} materials from text via NLP`);
+        console.log('[run-analysis-job] Step A (continued): Calling Gemini for text-based material extraction (Path B)...');
+        extractedMaterials = await callLLMExtraction(geminiApiKey, extractionResult.text);
+        console.log(`[run-analysis-job] Extracted ${extractedMaterials.length} materials from text via NLP`);
       } else {
-        console.log('No text content to extract - skipping LLM call');
+        console.log('[run-analysis-job] No text content to extract - skipping LLM call');
       }
 
       // Step B: Link materials to library (both Path A products and Path B text)
-      console.log('Step B: Linking materials to library...');
+      console.log('[run-analysis-job] Step B: Linking materials to library...');
       const linkedMaterials = await linkMaterialsToLibrary(
         supabase,
         extractedMaterials,
         extractionResult.products
       );
-      console.log(`Linked ${linkedMaterials.size} total materials to library`);
+      console.log(`[run-analysis-job] Linked ${linkedMaterials.size} total materials to library`);
 
       if (linkedMaterials.size === 0) {
         // No materials found - create a report saying so
@@ -632,8 +730,9 @@ Deno.serve(async (req) => {
       }
 
       // Step B (continued): Analyze and find alternatives
-      console.log('Step B: Analyzing materials and finding alternatives...');
+      console.log('[run-analysis-job] Step B (continued): Analyzing materials and finding alternatives...');
       const suggestions = await analyzeMaterials(supabase, linkedMaterials);
+      console.log(`[run-analysis-job] Generated ${suggestions.length} suggestions`);
 
       if (suggestions.length === 0) {
         // No suggestions - all materials are already optimal
@@ -674,14 +773,17 @@ Deno.serve(async (req) => {
       }
 
       // Step C: Generate ESG report
-      console.log('Step C: Generating ESG report...');
-      const report = await generateESGReport(supabaseUrl, supabaseServiceKey, projectName, suggestions);
+      console.log('[run-analysis-job] Step C: Generating ESG report...');
+      const report = await generateESGReport(geminiApiKey, projectName, suggestions);
+      console.log('[run-analysis-job] ESG report generated successfully');
 
       // Step D: Save the report
-      console.log('Step D: Saving ESG report...');
+      console.log('[run-analysis-job] Step D: Saving ESG report...');
       await saveESGReport(supabase, project_id, report);
+      console.log('[run-analysis-job] ESG report saved to database');
 
       // Mark job as complete
+      console.log(`[run-analysis-job] Marking job ${job_id} as complete...`);
       await supabase
         .from('project_analysis_job')
         .update({
@@ -690,7 +792,7 @@ Deno.serve(async (req) => {
         })
         .eq('job_id', job_id);
 
-      console.log(`Analysis job ${job_id} completed successfully`);
+      console.log(`[run-analysis-job] Analysis job ${job_id} completed successfully`);
 
       return new Response(
         JSON.stringify({
@@ -704,9 +806,10 @@ Deno.serve(async (req) => {
       );
 
     } catch (analysisError) {
-      console.error('Analysis error:', analysisError);
+      console.error('[run-analysis-job] Analysis error:', analysisError);
 
       // Mark job as failed
+      console.error(`[run-analysis-job] Marking job ${job_id} as failed...`);
       await supabase
         .from('project_analysis_job')
         .update({
@@ -720,7 +823,7 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('[run-analysis-job] Unexpected error:', error);
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
