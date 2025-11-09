@@ -390,48 +390,23 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[400px] pr-4">
-            <div className="space-y-4">
-              {/* Fill Manually Option */}
-              <button
-                onClick={() => setSelectedProductId('manual')}
-                className={`
-                  w-full text-left p-4 rounded-lg border-2 transition-all
-                  ${
-                    selectedProductId === 'manual'
-                      ? 'border-primary bg-primary/5 shadow-sm'
-                      : 'border-border hover:border-primary/50 hover:bg-accent/50'
-                  }
-                `}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="font-medium mb-1">Fill Manually</div>
-                    <div className="text-xs text-muted-foreground">
-                      Add an empty clause and fill in the fields yourself
-                    </div>
-                  </div>
-                  {selectedProductId === 'manual' && (
-                    <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                  )}
-                </div>
-              </button>
-
+          <ScrollArea className="max-h-[500px] pr-4">
+            <div className="space-y-3">
               {/* Loading State */}
               {productsLoading && (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-sm text-muted-foreground">Loading products...</p>
+                    <p className="text-sm text-foreground">Loading products...</p>
                   </div>
                 </div>
               )}
 
               {/* Products List */}
               {!productsLoading && products.length > 0 && (
-                <div className="space-y-3">
-                  <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                    Or select from product library
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-foreground uppercase tracking-wide px-1 mb-3">
+                    Select from product library
                   </div>
                   {(() => {
                     // Group products by manufacturer
@@ -446,11 +421,11 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                     const manufacturers = Object.keys(productsByManufacturer).sort();
 
                     return manufacturers.map((manufacturer) => (
-                      <div key={manufacturer} className="space-y-2">
-                        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide px-1">
+                      <div key={manufacturer} className="space-y-1.5">
+                        <h3 className="font-semibold text-xs text-foreground uppercase tracking-wide px-2 py-1 bg-primary/10 rounded">
                           {manufacturer}
                         </h3>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {productsByManufacturer[manufacturer].map((product) => {
                             const isSelected = selectedProductId === product.product_id;
                             return (
@@ -458,39 +433,34 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                                 key={product.product_id}
                                 onClick={() => setSelectedProductId(product.product_id)}
                                 className={`
-                                  w-full text-left p-4 rounded-lg border-2 transition-all
+                                  w-full text-left px-3 py-2 rounded-md border transition-all
                                   ${
                                     isSelected
-                                      ? 'border-primary bg-primary/5 shadow-sm'
-                                      : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                                      ? 'border-primary bg-primary/10 shadow-sm'
+                                      : 'border-border hover:border-primary/50 hover:bg-accent/30'
                                   }
                                 `}
                               >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1">
-                                    <div className="font-medium mb-1">{product.product_name}</div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm text-foreground mb-0.5">{product.product_name}</div>
                                     {product.product_data && Object.keys(product.product_data).length > 0 && (
-                                      <div className="text-xs text-muted-foreground space-y-0.5">
+                                      <div className="text-xs text-foreground/70 flex flex-wrap gap-x-3 gap-y-0.5">
                                         {Object.entries(product.product_data)
-                                          .slice(0, 3)
+                                          .slice(0, 2)
                                           .map(([key, value]) => (
-                                            <div key={key}>
-                                              <span className="font-medium capitalize">
+                                            <span key={key}>
+                                              <span className="font-medium text-foreground/80">
                                                 {key.replace(/_/g, ' ')}:
                                               </span>{' '}
                                               {String(value)}
-                                            </div>
+                                            </span>
                                           ))}
-                                        {Object.keys(product.product_data).length > 3 && (
-                                          <div className="text-muted-foreground/70 italic">
-                                            +{Object.keys(product.product_data).length - 3} more fields
-                                          </div>
-                                        )}
                                       </div>
                                     )}
                                   </div>
                                   {isSelected && (
-                                    <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                                    <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
                                   )}
                                 </div>
                               </button>
@@ -501,6 +471,45 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                     ));
                   })()}
                 </div>
+              )}
+
+              {/* Fill Manually Option - Last */}
+              {!productsLoading && (
+                <>
+                  {products.length > 0 && (
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-foreground/60">Or</span>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setSelectedProductId('manual')}
+                    className={`
+                      w-full text-left px-3 py-2.5 rounded-md border transition-all
+                      ${
+                        selectedProductId === 'manual'
+                          ? 'border-primary bg-primary/10 shadow-sm'
+                          : 'border-border hover:border-primary/50 hover:bg-accent/30'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-foreground">Fill Manually</div>
+                        <div className="text-xs text-foreground/70">
+                          Add an empty clause and fill in the fields yourself
+                        </div>
+                      </div>
+                      {selectedProductId === 'manual' && (
+                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                </>
               )}
 
               {/* Empty state when no products */}
