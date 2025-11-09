@@ -499,20 +499,23 @@ Deno.serve(async (req) => {
   const apikeyHeader = req.headers.get('apikey');
   
   console.log('[run-analysis-job] Checking authentication...');
-  const isServiceRoleAuth = authHeader?.includes(supabaseServiceKey) || apikeyHeader === supabaseServiceKey;
   
-  if (!isServiceRoleAuth && !authHeader) {
-    console.error('[run-analysis-job] Missing authorization - requires service role key for internal calls');
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized - service role key required' }),
-      {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
-
+  // Use exact equality check for security (not substring match)
+  const expectedAuthHeader = `Bearer ${supabaseServiceKey}`;
+  const isServiceRoleAuth = authHeader === expectedAuthHeader || apikeyHeader === supabaseServiceKey;
+  
   if (!isServiceRoleAuth) {
+    if (!authHeader && !apikeyHeader) {
+      console.error('[run-analysis-job] Missing authorization - requires service role key for internal calls');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - service role key required' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     console.error('[run-analysis-job] Invalid authorization - service role key mismatch');
     return new Response(
       JSON.stringify({ error: 'Unauthorized - invalid service role key' }),
