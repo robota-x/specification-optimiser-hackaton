@@ -1,0 +1,395 @@
+/**
+ * Clause Editor - Right panel for editing selected clause
+ * Supports both Hybrid (master-based) and Freeform clauses
+ */
+
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import {
+  useUpdateClauseFieldValues,
+  useUpdateFreeformClause,
+  useDeleteProjectClause,
+} from '@/hooks/useV2Projects';
+import type { ProjectClauseFull, FieldValues, FieldDefinition } from '@/types/v2-schema';
+import { isHybridClause, isFreeformClause } from '@/types/v2-schema';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Trash2, Save } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface ClauseEditorProps {
+  projectId: string;
+  clause: ProjectClauseFull | null;
+  onClauseUpdated: () => void;
+}
+
+export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEditorProps) {
+  const { toast } = useToast();
+
+  // Hybrid clause state
+  const [fieldValues, setFieldValues] = useState<FieldValues>({});
+
+  // Freeform clause state
+  const [freeformCawsNumber, setFreeformCawsNumber] = useState('');
+  const [freeformTitle, setFreeformTitle] = useState('');
+  const [freeformBody, setFreeformBody] = useState('');
+
+  // UI state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Mutations
+  const updateFieldValues = useUpdateClauseFieldValues();
+  const updateFreeform = useUpdateFreeformClause();
+  const deleteClause = useDeleteProjectClause();
+
+  // Load clause data when clause changes
+  useEffect(() => {
+    if (!clause) {
+      setFieldValues({});
+      setFreeformCawsNumber('');
+      setFreeformTitle('');
+      setFreeformBody('');
+      setHasUnsavedChanges(false);
+      return;
+    }
+
+    if (isHybridClause(clause)) {
+      // Load hybrid clause field values
+      setFieldValues(clause.field_values || {});
+    } else if (isFreeformClause(clause)) {
+      // Load freeform clause data
+      setFreeformCawsNumber(clause.freeform_caws_number || '');
+      setFreeformTitle(clause.freeform_title || '');
+      setFreeformBody(clause.freeform_body || '');
+    }
+
+    setHasUnsavedChanges(false);
+  }, [clause]);
+
+  const handleSave = async () => {
+    if (!clause) return;
+
+    try {
+      if (isHybridClause(clause)) {
+        await updateFieldValues.mutateAsync({
+          clauseId: clause.project_clause_id,
+          fieldValues,
+        });
+      } else if (isFreeformClause(clause)) {
+        await updateFreeform.mutateAsync({
+          clauseId: clause.project_clause_id,
+          cawsNumber: freeformCawsNumber,
+          title: freeformTitle,
+          body: freeformBody,
+        });
+      }
+
+      setHasUnsavedChanges(false);
+      onClauseUpdated();
+
+      toast({
+        title: 'Saved',
+        description: 'Clause has been updated',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error saving clause',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!clause) return;
+
+    try {
+      await deleteClause.mutateAsync({
+        clauseId: clause.project_clause_id,
+        projectId,
+      });
+
+      toast({
+        title: 'Clause deleted',
+        description: 'Clause has been removed from your project',
+      });
+
+      onClauseUpdated();
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting clause',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const renderField = (fieldDef: FieldDefinition) => {
+    const value = fieldValues[fieldDef.name] || '';
+
+    const handleChange = (newValue: any) => {
+      setFieldValues((prev) => ({ ...prev, [fieldDef.name]: newValue }));
+      setHasUnsavedChanges(true);
+    };
+
+    switch (fieldDef.type) {
+      case 'text':
+        return (
+          <Input
+            value={value as string}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder={fieldDef.placeholder}
+          />
+        );
+
+      case 'textarea':
+        return (
+          <Textarea
+            value={value as string}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder={fieldDef.placeholder}
+            rows={4}
+          />
+        );
+
+      case 'number':
+        return (
+          <Input
+            type="number"
+            value={value as number}
+            onChange={(e) => handleChange(Number(e.target.value))}
+            placeholder={fieldDef.placeholder}
+          />
+        );
+
+      case 'list':
+        const listValue = (value as string[]) || [];
+        return (
+          <div className="space-y-2">
+            {listValue.map((item, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={item}
+                  onChange={(e) => {
+                    const newList = [...listValue];
+                    newList[index] = e.target.value;
+                    handleChange(newList);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const newList = listValue.filter((_, i) => i !== index);
+                    handleChange(newList);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleChange([...listValue, ''])}
+            >
+              Add Item
+            </Button>
+          </div>
+        );
+
+      default:
+        return (
+          <Input
+            value={value as string}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder={fieldDef.placeholder}
+          />
+        );
+    }
+  };
+
+  if (!clause) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <p className="text-sm">Select a clause to edit</p>
+      </div>
+    );
+  }
+
+  const isHybrid = isHybridClause(clause);
+  const isFreeform = isFreeformClause(clause);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="p-6 border-b border-border">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="text-sm text-muted-foreground font-mono mb-1">
+              {isHybrid && clause.master_clause?.caws_number}
+              {isFreeform && clause.freeform_caws_number}
+            </div>
+            <h2 className="text-2xl font-bold">
+              {isHybrid && clause.master_clause?.title}
+              {isFreeform && clause.freeform_title}
+            </h2>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {hasUnsavedChanges && (
+          <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg px-4 py-2">
+            <span className="text-sm text-amber-900 dark:text-amber-200">
+              You have unsaved changes
+            </span>
+            <Button size="sm" onClick={handleSave} disabled={updateFieldValues.isPending || updateFreeform.isPending}>
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <ScrollArea className="flex-1">
+        <div className="p-6 space-y-6">
+          {/* Hybrid Clause Editor */}
+          {isHybrid && clause.master_clause && (
+            <>
+              {/* Guidance text */}
+              {clause.master_clause.guidance_text && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                  <p className="text-sm text-blue-900 dark:text-blue-200">
+                    {clause.master_clause.guidance_text}
+                  </p>
+                </div>
+              )}
+
+              {/* Field editors */}
+              {clause.master_clause.field_definitions.map((fieldDef) => (
+                <div key={fieldDef.name} className="space-y-2">
+                  <Label htmlFor={fieldDef.name}>
+                    {fieldDef.label}
+                    {fieldDef.required && <span className="text-destructive ml-1">*</span>}
+                  </Label>
+                  {fieldDef.description && (
+                    <p className="text-sm text-muted-foreground">{fieldDef.description}</p>
+                  )}
+                  {renderField(fieldDef)}
+                </div>
+              ))}
+
+              {/* Body template preview */}
+              {clause.master_clause.body_template && (
+                <div className="space-y-2">
+                  <Label>Preview</Label>
+                  <div className="bg-muted rounded-lg p-4 text-sm whitespace-pre-wrap">
+                    {clause.master_clause.body_template}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Freeform Clause Editor */}
+          {isFreeform && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="freeform_caws_number">CAWS Number</Label>
+                <Input
+                  id="freeform_caws_number"
+                  value={freeformCawsNumber}
+                  onChange={(e) => {
+                    setFreeformCawsNumber(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder="e.g., F10/999"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="freeform_title">Title</Label>
+                <Input
+                  id="freeform_title"
+                  value={freeformTitle}
+                  onChange={(e) => {
+                    setFreeformTitle(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder="Clause title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="freeform_body">Content (Markdown supported)</Label>
+                <Textarea
+                  id="freeform_body"
+                  value={freeformBody}
+                  onChange={(e) => {
+                    setFreeformBody(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder="Enter the clause content..."
+                  rows={12}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="p-6 border-t border-border">
+        <div className="flex justify-end gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={!hasUnsavedChanges || updateFieldValues.isPending || updateFreeform.isPending}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {updateFieldValues.isPending || updateFreeform.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Clause</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this clause? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
