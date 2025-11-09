@@ -77,6 +77,7 @@ export type Database = {
           block_type: string
           created_at: string
           custom_block_id: string | null
+          field_values: Json | null
           id: string
           position: number
           spec_id: string
@@ -87,6 +88,7 @@ export type Database = {
           block_type: string
           created_at?: string
           custom_block_id?: string | null
+          field_values?: Json | null
           id?: string
           position: number
           spec_id: string
@@ -97,6 +99,7 @@ export type Database = {
           block_type?: string
           created_at?: string
           custom_block_id?: string | null
+          field_values?: Json | null
           id?: string
           position?: number
           spec_id?: string

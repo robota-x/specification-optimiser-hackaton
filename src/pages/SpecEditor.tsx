@@ -19,6 +19,7 @@ import {
   createCustomBlock as createCustomBlockInDB,
   updateCustomBlock as updateCustomBlockInDB,
   deleteCustomBlock as deleteCustomBlockFromDB,
+  batchUpdateBlockValues,
 } from "@/lib/specContentService";
 import { SortableBlockList } from "@/components/blocks/SortableBlockList";
 import { BlockLibrary } from "@/components/blocks/BlockLibrary";
@@ -148,13 +149,14 @@ const SpecEditor = () => {
       setTemplates(templatesData);
       setCustomBlocks(customBlocksData);
 
-      // Initialize block values and expand first block
+      // Initialize block values from loaded data and expand first block
       const initialValues: Record<string, BlockValues> = {};
       const initialExpanded = new Set<string>();
 
       blocksData.forEach((block, index) => {
         if (block.block_type === "template" && block.template) {
-          initialValues[block.id] = getEmptyFieldValues(block.template);
+          // Use loaded field_values if they exist, otherwise use empty values
+          initialValues[block.id] = block.field_values || getEmptyFieldValues(block.template);
         }
         if (index === 0) {
           initialExpanded.add(block.id);
@@ -191,8 +193,17 @@ const SpecEditor = () => {
 
       if (specError) throw specError;
 
-      // TODO: Save block values when we add a field_values column to spec_content
-      // For now, block values are only stored in memory during editing
+      // Save all block field values
+      const blockUpdates = blocks
+        .filter((block) => block.block_type === "template" && blockValues[block.id])
+        .map((block) => ({
+          id: block.id,
+          values: blockValues[block.id],
+        }));
+
+      if (blockUpdates.length > 0) {
+        await batchUpdateBlockValues(blockUpdates);
+      }
 
       setHasUnsavedChanges(false);
 

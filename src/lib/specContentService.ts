@@ -22,9 +22,8 @@ export async function loadSpecContent(specId: string): Promise<SpecContentBlock[
     ...item,
     template: item.template || undefined,
     custom: item.custom || undefined,
-    field_values: item.block_type === "template" && item.template 
-      ? JSON.parse(item.template.content_json || "{}")
-      : undefined,
+    // Parse field_values from JSONB to our BlockValues type
+    field_values: item.field_values || {},
   }));
 }
 
@@ -44,7 +43,7 @@ export async function addTemplateBlock(
       block_type: "template",
       block_template_id: templateId,
       position,
-      // Store initial values in a field_values column if it exists, or handle separately
+      field_values: initialValues as any,
     })
     .select()
     .single();
@@ -76,6 +75,42 @@ export async function addCustomBlock(
   if (error) throw error;
   
   return data.id;
+}
+
+/**
+ * Update block field values
+ */
+export async function updateBlockValues(
+  blockId: string,
+  values: BlockValues
+): Promise<void> {
+  const { error } = await supabase
+    .from("spec_content")
+    .update({ field_values: values as any })
+    .eq("id", blockId);
+
+  if (error) throw error;
+}
+
+/**
+ * Batch update multiple blocks' field values
+ */
+export async function batchUpdateBlockValues(
+  updates: { id: string; values: BlockValues }[]
+): Promise<void> {
+  const promises = updates.map((update) =>
+    supabase
+      .from("spec_content")
+      .update({ field_values: update.values as any })
+      .eq("id", update.id)
+  );
+
+  const results = await Promise.all(promises);
+  const errors = results.filter((r) => r.error);
+  
+  if (errors.length > 0) {
+    throw new Error(`Failed to update ${errors.length} blocks`);
+  }
 }
 
 /**
