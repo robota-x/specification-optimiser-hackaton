@@ -576,3 +576,61 @@ export interface ESGSuggestionWithProject extends ProjectESGSuggestion {
 export interface ESGMaterialWithAlternatives extends ESGMaterialLibrary {
   alternatives?: ESGMaterialLibrary[];
 }
+
+// =====================================================================
+// PRODUCT LIBRARY - TYPE DEFINITIONS
+// =====================================================================
+
+/**
+ * Product Library table (real-world manufacturer products linked to master clauses)
+ */
+export interface Product {
+  product_id: string;
+  master_clause_id: string;
+  esg_material_id: string | null;
+  manufacturer: string;
+  product_name: string;
+  product_data: FieldValues;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Product with master clause details
+ */
+export interface ProductWithClause extends Product {
+  master_clause: MasterClause;
+}
+
+/**
+ * Product with ESG material data (for AI-powered suggestions)
+ */
+export interface ProductWithESGData extends Product {
+  esg_material: ESGMaterialLibrary | null;
+}
+
+/**
+ * Product with full details (master clause + ESG material)
+ */
+export interface ProductFull extends Product {
+  master_clause: MasterClause;
+  esg_material: ESGMaterialLibrary | null;
+}
+
+// =====================================================================
+// PRODUCT INSERT/UPDATE TYPES
+// =====================================================================
+
+/**
+ * Type for inserting a new product
+ */
+export type ProductInsert = Omit<Product, 'product_id' | 'created_at' | 'updated_at'> & {
+  product_id?: string;
+  is_active?: boolean;
+};
+
+/**
+ * Type for updating a product
+ */
+export type ProductUpdate = Partial<Omit<Product, 'product_id' | 'master_clause_id' | 'created_at' | 'updated_at'>>;
