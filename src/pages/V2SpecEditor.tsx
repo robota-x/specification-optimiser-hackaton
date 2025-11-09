@@ -21,6 +21,8 @@ import { ProjectNavigator } from '@/components/v2/ProjectNavigator';
 import { MasterLibraryBrowser } from '@/components/v2/MasterLibraryBrowser';
 import { ClauseEditor } from '@/components/v2/ClauseEditor';
 import { V2ProjectPrintView } from '@/components/v2/V2ProjectPrintView';
+import { ESGReport } from '@/components/esg';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ProjectClauseFull } from '@/types/v2-schema';
 
 export default function V2SpecEditor() {
@@ -210,40 +212,57 @@ export default function V2SpecEditor() {
         </div>
       </header>
 
-      {/* Two-panel layout: Sidebar (Navigator + Library) | Editor */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Project Navigator (top) + Master Library (bottom) */}
-        <aside className="w-96 border-r border-border bg-card flex flex-col">
-          {/* Top half: Project Navigator */}
-          <div className="flex-1 overflow-y-auto border-b border-border">
-            <ProjectNavigator
-              projectId={project.project_id}
-              clauses={clauses}
-              selectedClauseId={selectedClauseId}
-              onSelectClause={handleSelectClause}
-            />
-          </div>
+      {/* Main content with tabs for Editor and ESG Analysis */}
+      <Tabs defaultValue="editor" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="w-full rounded-none border-b border-border px-6">
+          <TabsTrigger value="editor">Editor</TabsTrigger>
+          <TabsTrigger value="esg">ESG Analysis</TabsTrigger>
+        </TabsList>
 
-          {/* Bottom half: Master Library */}
-          <div className="flex-1 overflow-y-auto">
-            <MasterLibraryBrowser
-              projectId={project.project_id}
-              masterLibrary={masterLibrary}
-            />
-          </div>
-        </aside>
+        {/* Editor Tab - Three-panel layout */}
+        <TabsContent value="editor" className="flex-1 flex overflow-hidden m-0">
+          {/* Left Sidebar: Project Navigator (top) + Master Library (bottom) */}
+          <aside className="w-96 border-r border-border bg-card flex flex-col">
+            {/* Top half: Project Navigator */}
+            <div className="flex-1 overflow-y-auto border-b border-border">
+              <ProjectNavigator
+                projectId={project.project_id}
+                clauses={clauses}
+                selectedClauseId={selectedClauseId}
+                onSelectClause={handleSelectClause}
+              />
+            </div>
 
-        {/* Right: Clause Editor (full width) */}
-        <main className="flex-1 overflow-y-auto bg-background">
-          <ClauseEditor
-            projectId={project.project_id}
-            clause={selectedClause || null}
-            onClauseUpdated={() => {
-              // Clauses will auto-refresh via React Query
-            }}
-          />
-        </main>
-      </div>
+            {/* Bottom half: Master Library */}
+            <div className="flex-1 overflow-y-auto">
+              <MasterLibraryBrowser
+                projectId={project.project_id}
+                masterLibrary={masterLibrary}
+              />
+            </div>
+          </aside>
+
+          {/* Right: Clause Editor (full width) */}
+          <main className="flex-1 overflow-y-auto bg-background">
+            <ClauseEditor
+              projectId={project.project_id}
+              clause={selectedClause || null}
+              onClauseUpdated={() => {
+                // Clauses will auto-refresh via React Query
+              }}
+            />
+          </main>
+        </TabsContent>
+
+        {/* ESG Analysis Tab */}
+        <TabsContent value="esg" className="flex-1 overflow-hidden m-0">
+          <div className="h-full overflow-y-auto">
+            <div className="container mx-auto px-6 py-8 max-w-5xl">
+              <ESGReport projectId={project.project_id} />
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Print view for PDF generation */}
       {project && (
