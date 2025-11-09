@@ -60,6 +60,61 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Authentication Setup
+
+This project uses Supabase for authentication with support for:
+- Email/Password authentication
+- Google OAuth (Social Login)
+- Anonymous users
+
+### Configuring Google OAuth in Supabase
+
+To enable Google social login, follow these steps:
+
+1. **Go to your Supabase project dashboard**
+   - Navigate to Authentication > Providers
+   - Find "Google" in the list of providers
+
+2. **Create Google OAuth credentials**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Navigate to "APIs & Services" > "Credentials"
+   - Click "Create Credentials" > "OAuth client ID"
+   - Select "Web application" as the application type
+   - Add authorized redirect URIs:
+     ```
+     https://<your-project-ref>.supabase.co/auth/v1/callback
+     ```
+   - Copy the Client ID and Client Secret
+
+3. **Configure Supabase**
+   - In your Supabase dashboard under Authentication > Providers > Google:
+   - Toggle "Enable Google provider" to ON
+   - Paste your Google Client ID
+   - Paste your Google Client Secret
+   - Click "Save"
+
+4. **Configure Redirect URLs** (if needed)
+   - In Authentication > URL Configuration
+   - Add your site URL (e.g., `https://yourdomain.com`)
+   - Add redirect URLs if using custom domains
+
+5. **Environment Variables**
+   Make sure you have the following in your `.env` file:
+   ```env
+   VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
+   VITE_SUPABASE_PROJECT_ID=<your-project-id>
+   ```
+
+### Authentication Settings
+
+The following authentication settings are configured:
+- **Email Confirmation**: Disabled (for simple SSO flow)
+- **2FA/MFA**: Disabled
+- **Anonymous Sign-ins**: Enabled
+- **Session Persistence**: Enabled (localStorage)
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/0a7950f1-7d4e-4118-b1b0-5f22bf938f94) and click on Share -> Publish.
