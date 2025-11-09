@@ -3,7 +3,7 @@
  * Supports both Hybrid (master-based) and Freeform clauses
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,13 +14,15 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   useUpdateClauseFieldValues,
   useUpdateFreeformClause,
   useDeleteProjectClause,
 } from '@/hooks/useV2Projects';
 import type { ProjectClauseFull, FieldValues, FieldDefinition } from '@/types/v2-schema';
-import { isHybridClause, isFreeformClause } from '@/types/v2-schema';
+import { isHybridClause, isFreeformClause, renderHybridClause } from '@/types/v2-schema';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Save } from 'lucide-react';
 import {
@@ -100,6 +102,22 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
     return () => clearTimeout(timer);
   }, [hasUnsavedChanges, fieldValues, freeformCawsNumber, freeformTitle, freeformBody, notes]);
+
+  // Render preview for hybrid clauses
+  const renderedPreview = useMemo(() => {
+    if (!clause) return null;
+
+    if (isHybridClause(clause) && clause.master_clause) {
+      try {
+        return renderHybridClause(clause.master_clause, fieldValues);
+      } catch (error) {
+        console.error('Error rendering preview:', error);
+        return null;
+      }
+    }
+
+    return null;
+  }, [clause, fieldValues]);
 
   const handleSave = async (isAutoSave = false) => {
     if (!clause) return;
@@ -356,16 +374,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
                   {renderField(fieldDef)}
                 </div>
               ))}
-
-              {/* Body template preview */}
-              {clause.master_clause.body_template && (
-                <div className="space-y-2">
-                  <Label>Preview</Label>
-                  <div className="bg-muted rounded-lg p-4 text-sm whitespace-pre-wrap">
-                    {clause.master_clause.body_template}
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -433,6 +441,34 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
           </div>
         </div>
       </ScrollArea>
+
+      {/* Preview Section */}
+      {(renderedPreview || (isFreeform && freeformBody)) && (
+        <div className="border-t border-border bg-muted/30">
+          <div className="p-6">
+            <h3 className="text-sm font-semibold mb-3">Preview</h3>
+            <div className="bg-background rounded-lg border border-border p-6">
+              {/* Hybrid clause preview */}
+              {renderedPreview && (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {renderedPreview.body}
+                  </ReactMarkdown>
+                </div>
+              )}
+
+              {/* Freeform clause preview */}
+              {isFreeform && freeformBody && !renderedPreview && (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {freeformBody}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-6 border-t border-border">
