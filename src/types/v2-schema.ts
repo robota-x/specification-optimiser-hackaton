@@ -465,3 +465,114 @@ export function getEmptyFieldValues(masterClause: MasterClause): FieldValues {
 
   return values;
 }
+
+// =====================================================================
+// ESG OPTIMIZATION ENGINE - TYPE DEFINITIONS
+// =====================================================================
+
+/**
+ * NLP Tags structure for material matching
+ */
+export interface NLPTags {
+  synonyms?: string[];
+  tags?: string[];
+}
+
+/**
+ * ESG Material Library table (canonical database of materials)
+ */
+export interface ESGMaterialLibrary {
+  esg_material_id: string;
+  organisation_id: string | null;
+  name: string;
+  data_source: string;
+  external_id: string | null;
+  embodied_carbon: number;
+  carbon_unit: string;
+  cost_impact_text: string | null;
+  modifications_text: string | null;
+  alternative_to_ids: string[] | null;
+  nlp_tags: NLPTags;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Project Analysis Job table (manages async ESG analysis workflow)
+ */
+export interface ProjectAnalysisJob {
+  job_id: string;
+  project_id: string;
+  status: 'queued' | 'running' | 'complete' | 'failed';
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+/**
+ * Project ESG Suggestion table (AI-generated suggestions/reports)
+ */
+export interface ProjectESGSuggestion {
+  suggestion_id: string;
+  project_id: string;
+  source_clause_id: string | null;
+  suggestion_title: string;
+  suggestion_narrative: string;
+  status: 'new' | 'seen' | 'dismissed';
+  created_at: string;
+  updated_at: string;
+}
+
+// =====================================================================
+// ESG INSERT/UPDATE TYPES
+// =====================================================================
+
+/**
+ * Type for inserting a new ESG material
+ */
+export type ESGMaterialLibraryInsert = Omit<ESGMaterialLibrary, 'esg_material_id' | 'created_at' | 'updated_at'> & {
+  esg_material_id?: string;
+  is_active?: boolean;
+};
+
+/**
+ * Type for inserting a new analysis job
+ */
+export type ProjectAnalysisJobInsert = Omit<ProjectAnalysisJob, 'job_id' | 'created_at' | 'completed_at'> & {
+  job_id?: string;
+  status?: 'queued' | 'running' | 'complete' | 'failed';
+};
+
+/**
+ * Type for inserting a new ESG suggestion
+ */
+export type ProjectESGSuggestionInsert = Omit<ProjectESGSuggestion, 'suggestion_id' | 'created_at' | 'updated_at'> & {
+  suggestion_id?: string;
+  status?: 'new' | 'seen' | 'dismissed';
+};
+
+// =====================================================================
+// ESG EXTENDED TYPES (with joins)
+// =====================================================================
+
+/**
+ * Project with its latest analysis job
+ */
+export interface ProjectWithAnalysisJob extends Project {
+  latest_analysis_job?: ProjectAnalysisJob;
+}
+
+/**
+ * ESG Suggestion with project details
+ */
+export interface ESGSuggestionWithProject extends ProjectESGSuggestion {
+  project?: Project;
+}
+
+/**
+ * ESG Material with alternatives (fully populated)
+ */
+export interface ESGMaterialWithAlternatives extends ESGMaterialLibrary {
+  alternatives?: ESGMaterialLibrary[];
+}
