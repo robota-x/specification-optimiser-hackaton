@@ -85,9 +85,9 @@ export function ProjectNavigator({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold">Project Navigator</h2>
-        <p className="text-sm text-muted-foreground">{clauses.length} clauses</p>
+      <div className="p-3 border-b border-border">
+        <h2 className="text-sm font-semibold">Project Navigator</h2>
+        <p className="text-xs text-muted-foreground">{clauses.length} clauses</p>
       </div>
 
       <ScrollArea className="flex-1">
@@ -100,11 +100,11 @@ export function ProjectNavigator({
           ) : (
             <div className="space-y-1">
               {Object.entries(groupedClauses).map(([sectionCode, { title, clauses }]) => (
-                <div key={sectionCode} className="space-y-1">
+                <div key={sectionCode} className="space-y-0.5">
                   {/* Section header */}
-                  <div className="flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-foreground">
-                    <Folder className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate">{title}</span>
+                  <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-foreground">
+                    <Folder className="h-3 w-3 text-muted-foreground" />
+                    <span className="truncate text-xs">{title}</span>
                   </div>
 
                   {/* Clauses in section */}
@@ -113,20 +113,20 @@ export function ProjectNavigator({
                       key={clause.project_clause_id}
                       onClick={() => onSelectClause(clause.project_clause_id)}
                       className={cn(
-                        'w-full flex items-start gap-2 px-3 py-2 text-left text-sm rounded-md transition-colors',
+                        'w-full flex items-start gap-2 px-2 py-1.5 text-left text-xs rounded-md transition-colors',
                         'hover:bg-accent hover:text-accent-foreground',
                         selectedClauseId === clause.project_clause_id &&
                           'bg-accent text-accent-foreground'
                       )}
                     >
-                      <File className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                      <File className="h-3 w-3 mt-0.5 flex-shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground font-mono">
                             {getClauseNumber(clause)}
                           </span>
                         </div>
-                        <div className="truncate">{getClauseTitle(clause)}</div>
+                        <div className="truncate text-xs leading-tight">{getClauseTitle(clause)}</div>
                       </div>
                     </button>
                   ))}

@@ -210,27 +210,30 @@ export default function V2SpecEditor() {
         </div>
       </header>
 
-      {/* Three-panel layout */}
+      {/* Two-panel layout: Sidebar (Navigator + Library) | Editor */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Panel 1: Project Navigator (Left) */}
-        <aside className="w-80 border-r border-border bg-card overflow-y-auto">
-          <ProjectNavigator
-            projectId={project.project_id}
-            clauses={clauses}
-            selectedClauseId={selectedClauseId}
-            onSelectClause={handleSelectClause}
-          />
+        {/* Left Sidebar: Project Navigator (top) + Master Library (bottom) */}
+        <aside className="w-96 border-r border-border bg-card flex flex-col">
+          {/* Top half: Project Navigator */}
+          <div className="flex-1 overflow-y-auto border-b border-border">
+            <ProjectNavigator
+              projectId={project.project_id}
+              clauses={clauses}
+              selectedClauseId={selectedClauseId}
+              onSelectClause={handleSelectClause}
+            />
+          </div>
+
+          {/* Bottom half: Master Library */}
+          <div className="flex-1 overflow-y-auto">
+            <MasterLibraryBrowser
+              projectId={project.project_id}
+              masterLibrary={masterLibrary}
+            />
+          </div>
         </aside>
 
-        {/* Panel 2: Master Library (Center) */}
-        <aside className="w-96 border-r border-border bg-card overflow-y-auto">
-          <MasterLibraryBrowser
-            projectId={project.project_id}
-            masterLibrary={masterLibrary}
-          />
-        </aside>
-
-        {/* Panel 3: Clause Editor (Right) */}
+        {/* Right: Clause Editor (full width) */}
         <main className="flex-1 overflow-y-auto bg-background">
           <ClauseEditor
             projectId={project.project_id}

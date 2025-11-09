@@ -11,6 +11,7 @@ import { useAddHybridClause, useAddFreeformClause } from '@/hooks/useV2Projects'
 import { cn } from '@/lib/utils';
 import type { MasterLibrary, MasterWorkSectionWithClauses, MasterClause } from '@/types/v2-schema';
 import { ChevronRight, ChevronDown, Plus, Search, FileText } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -135,26 +136,32 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
   });
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Master Library</h2>
-          <Button size="sm" variant="outline" onClick={handleOpenFreeformDialog}>
-            <Plus className="h-4 w-4 mr-1" />
-            Custom
-          </Button>
-        </div>
+    <TooltipProvider>
+      <div className="flex flex-col h-full">
+        <div className="p-3 border-b border-border space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Master Library</h2>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="sm" variant="outline" onClick={handleOpenFreeformDialog}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Custom
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add a custom freeform clause</TooltipContent>
+            </Tooltip>
+          </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search clauses..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-7 h-8 text-sm"
+            />
+          </div>
         </div>
-      </div>
 
       <ScrollArea className="flex-1">
         <div className="p-2">
@@ -183,17 +190,17 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                     {/* Section header */}
                     <button
                       onClick={() => toggleSection(section.work_section_id)}
-                      className="w-full flex items-center gap-2 px-2 py-2 text-left text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                        <ChevronDown className="h-3 w-3 flex-shrink-0" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                        <ChevronRight className="h-3 w-3 flex-shrink-0" />
                       )}
                       <span className="font-mono text-xs text-muted-foreground">
                         {section.caws_code}
                       </span>
-                      <span className="flex-1 truncate">{section.title}</span>
+                      <span className="flex-1 truncate text-xs">{section.title}</span>
                       <span className="text-xs text-muted-foreground">
                         {section.clauses.length}
                       </span>
@@ -201,30 +208,37 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
 
                     {/* Clauses in section */}
                     {isExpanded && (
-                      <div className="ml-6 space-y-0.5">
+                      <div className="ml-4 space-y-0.5">
                         {visibleClauses.map((clause) => (
                           <div
                             key={clause.master_clause_id}
-                            className="flex items-start gap-2 px-2 py-2 rounded-md hover:bg-accent/50 group"
+                            className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 group"
                           >
-                            <FileText className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                            <FileText className="h-3 w-3 mt-1 flex-shrink-0 text-muted-foreground" />
                             <div className="flex-1 min-w-0">
                               <div className="text-xs text-muted-foreground font-mono">
                                 {clause.caws_number}
                               </div>
-                              <div className="text-sm">{clause.title}</div>
+                              <div className="text-xs leading-tight">{clause.title}</div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() =>
-                                handleAddMasterClause(clause.master_clause_id, clause.title)
-                              }
-                              disabled={addHybridClause.isPending}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                  onClick={() =>
+                                    handleAddMasterClause(clause.master_clause_id, clause.title)
+                                  }
+                                  disabled={addHybridClause.isPending}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left">
+                                <p className="text-xs">Add "{clause.title}" to project</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         ))}
                       </div>
@@ -237,8 +251,8 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
         </div>
       </ScrollArea>
 
-      {/* Freeform Clause Dialog */}
-      <Dialog open={freeformDialogOpen} onOpenChange={setFreeformDialogOpen}>
+        {/* Freeform Clause Dialog */}
+        <Dialog open={freeformDialogOpen} onOpenChange={setFreeformDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Custom Clause</DialogTitle>
@@ -295,6 +309,7 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
