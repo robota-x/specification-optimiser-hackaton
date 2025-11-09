@@ -71,8 +71,7 @@ export async function cancelAndRetryAnalysis(projectId: string): Promise<{
       .from('project_analysis_job')
       .update({
         status: 'failed',
-        error_message: 'Cancelled by user',
-        updated_at: new Date().toISOString()
+        error_message: 'Cancelled by user'
       })
       .eq('project_id', projectId)
       .in('status', ['queued', 'running']);

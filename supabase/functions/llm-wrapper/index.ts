@@ -20,7 +20,7 @@ interface RateLimitResult {
  * Check global rate limits (across all users)
  */
 async function checkGlobalRateLimit(
-  supabase: ReturnType<typeof createClient>
+  supabase: any
 ): Promise<RateLimitResult> {
   const now = new Date();
   const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);

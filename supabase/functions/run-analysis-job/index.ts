@@ -79,9 +79,10 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
     .from('project_clause')
     .select(`
       project_clause_id,
-      caws_number,
+      freeform_caws_number,
       field_values,
       freeform_body,
+      freeform_title,
       master_clause_id,
       master_clause (
         caws_number,
@@ -90,8 +91,7 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
         field_definitions
       )
     `)
-    .eq('project_id', projectId)
-    .eq('is_active', true);
+    .eq('project_id', projectId);
 
   if (error) {
     console.error('Error fetching project clauses:', error);
@@ -110,8 +110,9 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
   const extractedProducts: ExtractedProduct[] = [];
 
   for (const clause of clauses) {
-    // Add CAWS number and context
-    textParts.push(`\n--- CLAUSE ${clause.caws_number} ---`);
+    // Get CAWS number - from master_clause for hybrid, or freeform_caws_number for freeform
+    const cawsNumber = clause.master_clause?.caws_number || clause.freeform_caws_number || 'UNKNOWN';
+    textParts.push(`\n--- CLAUSE ${cawsNumber} ---`);
 
     if (clause.master_clause_id && clause.master_clause) {
       // Hybrid clause - check for product selection FIRST (Path A - Easy)
@@ -560,7 +561,7 @@ Deno.serve(async (req) => {
       console.log(`[run-analysis-job] Fetching project ${project_id}...`);
       const { data: project, error: projectError } = await supabase
         .from('project')
-        .select('project_name')
+        .select('name')
         .eq('project_id', project_id)
         .single();
 
@@ -569,7 +570,7 @@ Deno.serve(async (req) => {
         throw new Error('Project not found');
       }
 
-      const projectName = project.project_name || 'Untitled Project';
+      const projectName = project.name || 'Untitled Project';
       console.log(`[run-analysis-job] Project name: ${projectName}`);
 
       // Step A: Extract materials from project (both products and text)
