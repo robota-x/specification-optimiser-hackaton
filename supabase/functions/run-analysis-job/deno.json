@@ -9,5 +9,11 @@
   "compilerOptions": {
     "lib": ["deno.window"],
     "strict": true
+  },
+  "deploy": {
+    "entryPoint": "index.ts"
+  },
+  "supabase": {
+    "verify_jwt": false
   }
 }

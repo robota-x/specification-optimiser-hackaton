@@ -224,18 +224,19 @@ IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, mar
 }
 
 Deno.serve(async (req) => {
-  console.log('[llm-wrapper] Request received:', req.method, req.url);
-  
+  const requestId = crypto.randomUUID().substring(0, 8);
+  console.log(`[llm-wrapper:${requestId}] Request received: ${req.method} ${req.url}`);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('[llm-wrapper] CORS preflight request');
+    console.log(`[llm-wrapper:${requestId}] CORS preflight request`);
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     // Only accept POST requests
     if (req.method !== 'POST') {
-      console.log('[llm-wrapper] Method not allowed:', req.method);
+      console.log(`[llm-wrapper:${requestId}] Method not allowed: ${req.method}`);
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
         {
@@ -245,17 +246,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client with native auth (anon key + request headers)
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    // Create client with anon key and pass Authorization header for native auth
+
+    // Check for Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.log('[llm-wrapper] Missing authorization header');
+      console.error(`[llm-wrapper:${requestId}] Missing authorization header`);
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: 'Unauthorized - missing authorization header' }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -263,21 +263,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    console.log(`[llm-wrapper:${requestId}] Authorization header present, validating...`);
+
+    // Create service role client with the provided auth header
+    // This allows native auth validation for both user JWTs and service role tokens
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey, {
       global: {
         headers: { Authorization: authHeader },
       },
     });
-    console.log('[llm-wrapper] Supabase client initialized with native auth');
 
-    // Authenticate the user using native Supabase auth (no token extraction needed)
-    console.log('[llm-wrapper] Validating user token...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Validate authentication using native Supabase auth
+    // This works for both user JWT tokens and service role tokens
+    console.log(`[llm-wrapper:${requestId}] Validating authentication...`);
+    const { data: { user }, error: authError } = await serviceSupabase.auth.getUser();
 
     if (authError || !user) {
-      console.error('[llm-wrapper] Authentication failed:', authError?.message);
+      console.error(`[llm-wrapper:${requestId}] Authentication failed:`, authError?.message || 'No user found');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized - invalid authentication token' }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -286,18 +290,21 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id;
-    console.log('[llm-wrapper] User authenticated:', userId);
+    console.log(`[llm-wrapper:${requestId}] User authenticated: ${userId}`);
 
-    // Create service role client for admin operations (bypassing RLS for logging)
+    // Create admin client for database operations (bypassing RLS for logging)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Use the service supabase client for user context operations
+    const supabase = serviceSupabase;
+
     // Parse request body
-    console.log('[llm-wrapper] Parsing request body...');
+    console.log(`[llm-wrapper:${requestId}] Parsing request body...`);
     const requestBody = await req.json() as LLMRequest;
     const { prompt_type, payload } = requestBody;
 
     if (!prompt_type || !payload) {
-      console.error('[llm-wrapper] Missing required fields - prompt_type:', prompt_type, 'payload:', !!payload);
+      console.error(`[llm-wrapper:${requestId}] Missing required fields - prompt_type:`, prompt_type, 'payload:', !!payload);
       return new Response(
         JSON.stringify({ error: 'Missing required fields: prompt_type, payload' }),
         {
@@ -309,7 +316,7 @@ Deno.serve(async (req) => {
 
     // Validate prompt_type
     if (prompt_type !== 'extract' && prompt_type !== 'report') {
-      console.error('[llm-wrapper] Invalid prompt_type:', prompt_type);
+      console.error(`[llm-wrapper:${requestId}] Invalid prompt_type:`, prompt_type);
       return new Response(
         JSON.stringify({ error: 'Invalid prompt_type. Must be "extract" or "report"' }),
         {
@@ -319,10 +326,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[llm-wrapper] Processing ${prompt_type} request for user ${userId}`);
+    console.log(`[llm-wrapper:${requestId}] Processing ${prompt_type} request for user ${userId}`);
 
     // Create pending entry in database for logging (using admin client)
-    console.log('[llm-wrapper] Creating request log entry...');
+    console.log(`[llm-wrapper:${requestId}] Creating request log entry...`);
     const { data: requestLog, error: insertError } = await supabaseAdmin
       .from('gemini_requests')
       .insert({
@@ -334,7 +341,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertError || !requestLog) {
-      console.error('[llm-wrapper] Error creating request log:', insertError);
+      console.error(`[llm-wrapper:${requestId}] Error creating request log:`, insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to log request' }),
         {
@@ -344,15 +351,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[llm-wrapper] Request log created with ID: ${requestLog.id}`);
+    console.log(`[llm-wrapper:${requestId}] Request log created with ID: ${requestLog.id}`);
 
     // Check global rate limits (using admin client)
-    console.log('[llm-wrapper] Checking global rate limits...');
+    console.log(`[llm-wrapper:${requestId}] Checking global rate limits...`);
     const rateLimitResult = await checkGlobalRateLimit(supabaseAdmin);
-    console.log(`[llm-wrapper] Rate limit check - allowed: ${rateLimitResult.allowed}, minuteCount: ${rateLimitResult.minuteCount}, hourCount: ${rateLimitResult.hourCount}`);
+    console.log(`[llm-wrapper:${requestId}] Rate limit check - allowed: ${rateLimitResult.allowed}, minuteCount: ${rateLimitResult.minuteCount}, hourCount: ${rateLimitResult.hourCount}`);
 
     if (!rateLimitResult.allowed) {
-      console.error(`[llm-wrapper] Rate limit exceeded - minuteCount: ${rateLimitResult.minuteCount}, hourCount: ${rateLimitResult.hourCount}`);
+      console.error(`[llm-wrapper:${requestId}] Rate limit exceeded - minuteCount: ${rateLimitResult.minuteCount}, hourCount: ${rateLimitResult.hourCount}`);
       // Update request status to failed (rate limited) - using admin client
       await supabaseAdmin
         .from('gemini_requests')
@@ -383,10 +390,10 @@ Deno.serve(async (req) => {
     }
 
     // Initialize Gemini API
-    console.log('[llm-wrapper] Initializing Gemini API...');
+    console.log(`[llm-wrapper:${requestId}] Initializing Gemini API...`);
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
-      console.error('[llm-wrapper] Gemini API key not configured');
+      console.error(`[llm-wrapper:${requestId}] Gemini API key not configured`);
       return new Response(
         JSON.stringify({ error: 'Gemini API key not configured' }),
         {
@@ -401,19 +408,19 @@ Deno.serve(async (req) => {
     // Use a more capable model for complex tasks
     const modelName = prompt_type === 'report' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
     const model = genAI.getGenerativeModel({ model: modelName });
-    console.log(`[llm-wrapper] Using Gemini model: ${modelName}`);
+    console.log(`[llm-wrapper:${requestId}] Using Gemini model: ${modelName}`);
 
     // Build the appropriate prompt
-    console.log(`[llm-wrapper] Building prompt for type: ${prompt_type}...`);
+    console.log(`[llm-wrapper:${requestId}] Building prompt for type: ${prompt_type}...`);
     let prompt: string;
     switch (prompt_type) {
       case 'extract':
         prompt = buildExtractionPrompt(payload as ExtractPayload);
-        console.log(`[llm-wrapper] Extraction prompt built, length: ${prompt.length} characters`);
+        console.log(`[llm-wrapper:${requestId}] Extraction prompt built, length: ${prompt.length} characters`);
         break;
       case 'report':
         prompt = buildReportPrompt(payload as ReportPayload);
-        console.log(`[llm-wrapper] Report prompt built, length: ${prompt.length} characters`);
+        console.log(`[llm-wrapper:${requestId}] Report prompt built, length: ${prompt.length} characters`);
         break;
       default:
         throw new Error('Invalid prompt_type');
@@ -421,14 +428,14 @@ Deno.serve(async (req) => {
 
     try {
       // Call Gemini API
-      console.log('[llm-wrapper] Calling Gemini API...');
+      console.log(`[llm-wrapper:${requestId}] Calling Gemini API...`);
       const result = await model.generateContent(prompt);
       const response = result.response;
       const text = response.text();
-      console.log(`[llm-wrapper] Gemini API response received, length: ${text.length} characters`);
+      console.log(`[llm-wrapper:${requestId}] Gemini API response received, length: ${text.length} characters`);
 
       // For extraction and report types, we expect JSON
-      console.log('[llm-wrapper] Parsing Gemini response as JSON...');
+      console.log(`[llm-wrapper:${requestId}] Parsing Gemini response as JSON...`);
       let parsedResponse: any;
       try {
         // Remove markdown code blocks if present
@@ -438,10 +445,10 @@ Deno.serve(async (req) => {
           .trim();
 
         parsedResponse = JSON.parse(cleanedText);
-        console.log('[llm-wrapper] Successfully parsed JSON response');
+        console.log(`[llm-wrapper:${requestId}] Successfully parsed JSON response`);
       } catch (parseError) {
-        console.error('[llm-wrapper] Failed to parse LLM response as JSON:', parseError);
-        console.error('[llm-wrapper] Raw response (first 500 chars):', text.substring(0, 500));
+        console.error(`[llm-wrapper:${requestId}] Failed to parse LLM response as JSON:`, parseError);
+        console.error(`[llm-wrapper:${requestId}] Raw response (first 500 chars):`, text.substring(0, 500));
 
         // Update request status to failed - using admin client
         await supabaseAdmin
@@ -467,7 +474,7 @@ Deno.serve(async (req) => {
       }
 
       // Update request status to success - using admin client
-      console.log(`[llm-wrapper] Updating request log ${requestLog.id} to success`);
+      console.log(`[llm-wrapper:${requestId}] Updating request log ${requestLog.id} to success`);
       await supabaseAdmin
         .from('gemini_requests')
         .update({
@@ -476,7 +483,7 @@ Deno.serve(async (req) => {
         })
         .eq('id', requestLog.id);
 
-      console.log(`[llm-wrapper] Request completed successfully for user ${userId}, prompt_type: ${prompt_type}`);
+      console.log(`[llm-wrapper:${requestId}] Request completed successfully for user ${userId}, prompt_type: ${prompt_type}`);
       return new Response(
         JSON.stringify({
           success: true,
@@ -490,7 +497,7 @@ Deno.serve(async (req) => {
       );
 
     } catch (geminiError) {
-      console.error('[llm-wrapper] Error calling Gemini API:', geminiError);
+      console.error(`[llm-wrapper:${requestId}] Error calling Gemini API:`, geminiError);
 
       // Update request status to failed - using admin client
       await supabaseAdmin
@@ -515,7 +522,7 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[llm-wrapper] Unexpected error:', error);
+    console.error(`[llm-wrapper:${requestId}] Unexpected error:`, error);
     return new Response(
       JSON.stringify({
         error: 'Internal server error',

@@ -86,7 +86,7 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
       master_clause_id,
       master_clause (
         caws_number,
-        short_title,
+        title,
         body_template,
         field_definitions
       )
@@ -147,7 +147,7 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
       }
 
       // Then build text for NLP extraction (Path B - Hard)
-      textParts.push(`Title: ${clause.master_clause.short_title}`);
+      textParts.push(`Title: ${clause.master_clause.title}`);
 
       let renderedText = clause.master_clause.body_template || '';
 
@@ -187,34 +187,28 @@ async function extractProjectContent(supabase: any, projectId: string): Promise<
 /**
  * Call the LLM wrapper to extract materials
  */
-async function callLLMExtraction(supabaseUrl: string, serviceKey: string, text: string): Promise<ExtractedMaterial[]> {
-  const llmUrl = `${supabaseUrl}/functions/v1/llm-wrapper`;
+async function callLLMExtraction(supabase: any, text: string): Promise<ExtractedMaterial[]> {
+  console.log('[callLLMExtraction] Calling llm-wrapper for material extraction...');
 
-  const response = await fetch(llmUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`
-    },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke('llm-wrapper', {
+    body: {
       prompt_type: 'extract',
       payload: { text }
-    })
+    }
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('LLM extraction failed:', errorText);
+  if (error) {
+    console.error('[callLLMExtraction] LLM extraction failed:', error);
     throw new Error('Failed to extract materials from text');
   }
 
-  const result = await response.json();
-
-  if (!result.success || !result.data) {
+  if (!data || !data.success || !data.data) {
+    console.error('[callLLMExtraction] Invalid LLM response:', data);
     throw new Error('Invalid LLM extraction response');
   }
 
-  return result.data as ExtractedMaterial[];
+  console.log(`[callLLMExtraction] Extracted ${data.data.length} materials from text`);
+  return data.data as ExtractedMaterial[];
 }
 
 /**
@@ -370,23 +364,17 @@ async function analyzeMaterials(
  * Call the LLM to generate the ESG report
  */
 async function generateESGReport(
-  supabaseUrl: string,
-  serviceKey: string,
+  supabase: any,
   projectName: string,
   suggestions: Suggestion[]
 ): Promise<any> {
+  console.log('[generateESGReport] Generating ESG report via llm-wrapper...');
+
   const totalCurrentCarbon = suggestions.reduce((sum, s) => sum + s.currentCarbon, 0);
   const totalPotentialSavings = suggestions.reduce((sum, s) => sum + s.savings, 0);
 
-  const llmUrl = `${supabaseUrl}/functions/v1/llm-wrapper`;
-
-  const response = await fetch(llmUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceKey}`
-    },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke('llm-wrapper', {
+    body: {
       prompt_type: 'report',
       payload: {
         projectName,
@@ -397,22 +385,21 @@ async function generateESGReport(
           suggestions
         }
       }
-    })
+    }
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('LLM report generation failed:', errorText);
+  if (error) {
+    console.error('[generateESGReport] LLM report generation failed:', error);
     throw new Error('Failed to generate ESG report');
   }
 
-  const result = await response.json();
-
-  if (!result.success || !result.data) {
+  if (!data || !data.success || !data.data) {
+    console.error('[generateESGReport] Invalid LLM response:', data);
     throw new Error('Invalid LLM report response');
   }
 
-  return result.data;
+  console.log('[generateESGReport] ESG report generated successfully');
+  return data.data;
 }
 
 /**
@@ -633,7 +620,7 @@ Deno.serve(async (req) => {
 
       if (extractionResult.text && extractionResult.text.trim().length > 0) {
         console.log('[run-analysis-job] Step A (continued): Calling LLM for text-based material extraction (Path B)...');
-        extractedMaterials = await callLLMExtraction(supabaseUrl, supabaseServiceKey, extractionResult.text);
+        extractedMaterials = await callLLMExtraction(supabase, extractionResult.text);
         console.log(`[run-analysis-job] Extracted ${extractedMaterials.length} materials from text via NLP`);
       } else {
         console.log('[run-analysis-job] No text content to extract - skipping LLM call');
@@ -731,7 +718,7 @@ Deno.serve(async (req) => {
 
       // Step C: Generate ESG report
       console.log('[run-analysis-job] Step C: Generating ESG report...');
-      const report = await generateESGReport(supabaseUrl, supabaseServiceKey, projectName, suggestions);
+      const report = await generateESGReport(supabase, projectName, suggestions);
       console.log('[run-analysis-job] ESG report generated successfully');
 
       // Step D: Save the report
