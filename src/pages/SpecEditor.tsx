@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Plus, Library, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Save, Plus, Library, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { SpecContentBlock, BlockTemplate, CustomBlock, BlockValues } from "@/types/blocks";
 import { getEmptyFieldValues } from "@/lib/blockUtils";
@@ -37,6 +37,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SpecPrintView } from "@/components/pdf/SpecPrintView";
+import { useSpecPDF } from "@/hooks/useSpecPDF";
 
 interface Spec {
   id: string;
@@ -49,6 +51,7 @@ const SpecEditor = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { generatePDF } = useSpecPDF();
   
   // Auth & spec state
   const [user, setUser] = useState<User | null>(null);
@@ -499,6 +502,14 @@ const SpecEditor = () => {
             {hasUnsavedChanges && (
               <span className="text-xs text-muted-foreground">Unsaved changes</span>
             )}
+            <Button
+              variant="outline"
+              onClick={() => generatePDF(title || "Specification")}
+              disabled={!spec}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
             <Button onClick={() => handleSave()} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Saving..." : "Save"}
@@ -623,6 +634,16 @@ const SpecEditor = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Print view for PDF generation */}
+      {spec && (
+        <SpecPrintView
+          title={title}
+          description={description}
+          blocks={blocks}
+          blockValues={blockValues}
+        />
+      )}
     </div>
   );
 };

@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, LogOut } from "lucide-react";
+import { Plus, FileText, LogOut, Download } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { SpecPDFGenerator } from "@/components/pdf/SpecPDFGenerator";
 
 interface Spec {
   id: string;
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingPDFForSpec, setGeneratingPDFForSpec] = useState<Spec | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -92,6 +94,11 @@ const Dashboard = () => {
     navigate("/");
   };
 
+  const handleDownloadPDF = (spec: Spec, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click navigation
+    setGeneratingPDFForSpec(spec);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
@@ -160,15 +167,34 @@ const Dashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Last updated: {new Date(spec.updated_at).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Last updated: {new Date(spec.updated_at).toLocaleDateString()}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleDownloadPDF(spec, e)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
       </main>
+
+      {/* PDF Generator */}
+      {generatingPDFForSpec && (
+        <SpecPDFGenerator
+          specId={generatingPDFForSpec.id}
+          title={generatingPDFForSpec.title}
+          description={generatingPDFForSpec.description || ""}
+          onComplete={() => setGeneratingPDFForSpec(null)}
+        />
+      )}
     </div>
   );
 };
