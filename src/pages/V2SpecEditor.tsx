@@ -21,7 +21,6 @@ import { ProjectNavigator } from '@/components/v2/ProjectNavigator';
 import { MasterLibraryBrowser } from '@/components/v2/MasterLibraryBrowser';
 import { ClauseEditor } from '@/components/v2/ClauseEditor';
 import { ESGReport } from '@/components/esg';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ProjectClauseFull } from '@/types/v2-schema';
 import { openPrintDialog } from '@/utils/printDocument';
 
@@ -38,6 +37,7 @@ export default function V2SpecEditor() {
   const [projectDescription, setProjectDescription] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedClauseId, setSelectedClauseId] = useState<string | null>(null);
+  const [showESGAnalysis, setShowESGAnalysis] = useState(false);
 
   // Queries
   const { data: project, isLoading: projectLoading } = useProject(id);
@@ -229,58 +229,62 @@ export default function V2SpecEditor() {
         </div>
       </header>
 
-      {/* Main content with enhanced tabs */}
-      <Tabs defaultValue="editor" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="w-full rounded-none border-b-2 border-border px-6 h-12 bg-muted/30">
-          <TabsTrigger value="editor" className="text-base data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            Editor
-          </TabsTrigger>
-          <TabsTrigger value="esg" className="text-base data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            ESG Analysis
-          </TabsTrigger>
-        </TabsList>
+      {/* Main content - conditional rendering based on view */}
+      <div className="flex-1 flex overflow-hidden">
+        {!showESGAnalysis ? (
+          <>
+            {/* Editor View - Three-panel layout with refined borders */}
+            {/* Left Sidebar: Master Library */}
+            <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
+              <MasterLibraryBrowser
+                projectId={project.project_id}
+                masterLibrary={masterLibrary}
+              />
+            </aside>
 
-        {/* Editor Tab - Three-panel layout with refined borders */}
-        <TabsContent value="editor" className="flex-1 flex overflow-hidden m-0">
-          {/* Left Sidebar: Master Library */}
-          <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
-            <MasterLibraryBrowser
-              projectId={project.project_id}
-              masterLibrary={masterLibrary}
-            />
-          </aside>
+            {/* Middle Sidebar: Project Navigator */}
+            <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
+              <ProjectNavigator
+                projectId={project.project_id}
+                clauses={clauses}
+                selectedClauseId={selectedClauseId}
+                onSelectClause={handleSelectClause}
+                onRunESGAnalysis={() => setShowESGAnalysis(true)}
+              />
+            </aside>
 
-          {/* Middle Sidebar: Project Navigator */}
-          <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
-            <ProjectNavigator
-              projectId={project.project_id}
-              clauses={clauses}
-              selectedClauseId={selectedClauseId}
-              onSelectClause={handleSelectClause}
-            />
-          </aside>
-
-          {/* Right: Clause Editor (full width) */}
-          <main className="flex-1 overflow-y-auto bg-background">
-            <ClauseEditor
-              projectId={project.project_id}
-              clause={selectedClause || null}
-              onClauseUpdated={() => {
-                // Clauses will auto-refresh via React Query
-              }}
-            />
-          </main>
-        </TabsContent>
-
-        {/* ESG Analysis Tab with enhanced container */}
-        <TabsContent value="esg" className="flex-1 overflow-hidden m-0">
-          <div className="h-full overflow-y-auto bg-muted/20">
-            <div className="container mx-auto px-6 py-8 max-w-6xl">
-              <ESGReport projectId={project.project_id} />
+            {/* Right: Clause Editor (full width) */}
+            <main className="flex-1 overflow-y-auto bg-background">
+              <ClauseEditor
+                projectId={project.project_id}
+                clause={selectedClause || null}
+                onClauseUpdated={() => {
+                  // Clauses will auto-refresh via React Query
+                }}
+              />
+            </main>
+          </>
+        ) : (
+          <>
+            {/* ESG Analysis View */}
+            <div className="flex-1 h-full overflow-y-auto bg-muted/20">
+              <div className="container mx-auto px-6 py-8 max-w-6xl">
+                <div className="mb-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowESGAnalysis(false)}
+                    className="border-2"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Editor
+                  </Button>
+                </div>
+                <ESGReport projectId={project.project_id} />
+              </div>
             </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+          </>
+        )}
+      </div>
     </div>
   );
 }
