@@ -197,9 +197,9 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
     <TooltipProvider>
       <div className="flex flex-col h-full">
         {/* Header with enhanced styling */}
-        <div className="p-4 border-b-2 border-border space-y-3 bg-gradient-to-r from-card to-secondary/10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">Master Library</h2>
+        <div className="p-5 border-b-2 border-border space-y-3 bg-gradient-to-br from-purple-50 via-card to-blue-50 dark:from-purple-950/20 dark:via-card dark:to-blue-950/20">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent tracking-tight">Master Library</h2>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -261,15 +261,15 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                       className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg hover:bg-accent/20 transition-all duration-200 border-2 border-transparent hover:border-accent/30"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-primary" />
+                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-purple-600" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 flex-shrink-0 text-primary" />
+                        <ChevronRight className="h-4 w-4 flex-shrink-0 text-purple-600" />
                       )}
-                      <span className="font-mono text-xs font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      <span className="font-mono text-xs font-medium px-2 py-1 rounded-md bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                         {section.caws_code}
                       </span>
-                      <span className="flex-1 truncate text-sm font-medium">{section.title}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                      <span className="flex-1 text-sm font-medium break-words">{section.title}</span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium shadow-sm">
                         {section.clauses.length}
                       </span>
                     </button>
@@ -282,19 +282,19 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                             key={clause.master_clause_id}
                             className="flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-accent/20 border-2 border-transparent hover:border-accent/30 transition-all duration-200 group"
                           >
-                            <FileText className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-mono font-medium px-1.5 py-0.5 rounded bg-muted/50 inline-block mb-1">
+                            <FileText className="h-4 w-4 mt-0.5 flex-shrink-0 text-purple-500" />
+                            <div className="flex-1 min-w-0 overflow-visible">
+                              <div className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 inline-block mb-1">
                                 {clause.caws_number}
                               </div>
-                              <div className="text-sm leading-tight font-medium">{clause.title}</div>
+                              <div className="text-sm leading-tight font-medium break-words">{clause.title}</div>
                             </div>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   size="sm"
                                   variant="default"
-                                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 shadow-md"
+                                  className="h-8 w-8 p-0 group-hover:opacity-100 transition-all flex-shrink-0 shadow-md opacity-60"
                                   onClick={() => handleOpenProductModal(clause)}
                                   disabled={addHybridClause.isPending}
                                 >

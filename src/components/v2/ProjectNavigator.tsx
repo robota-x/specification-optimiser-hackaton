@@ -2,18 +2,31 @@
  * Project Navigator - Left panel showing project clause tree
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { ProjectClauseFull } from '@/types/v2-schema';
-import { ChevronRight, File, Folder } from 'lucide-react';
+import { ChevronRight, File, Folder, Trash2, BarChart3 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useDeleteProjectClause } from '@/hooks/useV2Projects';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ProjectNavigatorProps {
   projectId: string;
   clauses: ProjectClauseFull[];
   selectedClauseId: string | null;
   onSelectClause: (clauseId: string) => void;
+  onRunESGAnalysis?: () => void;
 }
 
 interface GroupedClauses {
@@ -28,7 +41,38 @@ export function ProjectNavigator({
   clauses,
   selectedClauseId,
   onSelectClause,
+  onRunESGAnalysis,
 }: ProjectNavigatorProps) {
+  const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const deleteClause = useDeleteProjectClause();
+
+  const selectedClause = clauses.find((c) => c.project_clause_id === selectedClauseId);
+
+  const handleDelete = async () => {
+    if (!selectedClauseId) return;
+
+    try {
+      await deleteClause.mutateAsync({
+        clauseId: selectedClauseId,
+        projectId,
+      });
+
+      toast({
+        title: 'Clause deleted',
+        description: 'Clause has been removed from your project',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting clause',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+    }
+  };
+
   // Group clauses by work section
   const groupedClauses = useMemo(() => {
     const groups: GroupedClauses = {};
@@ -69,13 +113,6 @@ export function ProjectNavigator({
       }, {} as GroupedClauses);
   }, [clauses]);
 
-  const getClauseTitle = (clause: ProjectClauseFull): string => {
-    if (clause.master_clause) {
-      return clause.master_clause.title;
-    }
-    return clause.freeform_title || 'Untitled Clause';
-  };
-
   const getClauseNumber = (clause: ProjectClauseFull): string => {
     if (clause.master_clause) {
       return clause.master_clause.caws_number;
@@ -83,16 +120,45 @@ export function ProjectNavigator({
     return clause.freeform_caws_number || '';
   };
 
+  const getClauseTitle = (clause: ProjectClauseFull): string => {
+    if (clause.master_clause) {
+      return clause.master_clause.title;
+    }
+    return clause.freeform_title || 'Untitled Clause';
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with enhanced styling */}
-      <div className="p-4 border-b-2 border-border bg-gradient-to-r from-card to-secondary/10">
-        <h2 className="text-base font-bold text-foreground">Current Project</h2>
-        <div className="flex items-center gap-2 mt-1">
+      <div className="p-5 border-b-2 border-border bg-gradient-to-br from-orange-50 via-card to-pink-50 dark:from-orange-950/20 dark:via-card dark:to-pink-950/20">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent tracking-tight">Current Project</h2>
+          {selectedClauseId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="border-2 hover:bg-destructive/10 hover:border-destructive hover:text-destructive h-8 w-8 p-0"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           <div className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">
             {clauses.length} {clauses.length === 1 ? 'clause' : 'clauses'}
           </div>
         </div>
+        {onRunESGAnalysis && (
+          <Button
+            onClick={onRunESGAnalysis}
+            className="w-full mt-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-md"
+            size="sm"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Run ESG Analysis
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1">
@@ -110,9 +176,9 @@ export function ProjectNavigator({
               {Object.entries(groupedClauses).map(([sectionCode, { title, clauses }]) => (
                 <div key={sectionCode} className="space-y-1">
                   {/* Section header with enhanced styling */}
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/50">
-                    <Folder className="h-4 w-4 text-primary" />
-                    <span className="truncate text-xs font-semibold text-foreground">{title}</span>
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-gradient-to-r from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 border border-orange-200 dark:border-orange-800">
+                    <Folder className="h-4 w-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+                    <span className="text-xs font-semibold text-orange-900 dark:text-orange-100 break-words">{title}</span>
                   </div>
 
                   {/* Clauses in section with better hover states */}
@@ -127,14 +193,14 @@ export function ProjectNavigator({
                           'bg-accent text-accent-foreground shadow-md border-l-2 border-accent'
                       )}
                     >
-                      <File className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
+                      <File className="h-4 w-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                      <div className="flex-1 min-w-0 overflow-visible">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono font-medium px-1.5 py-0.5 rounded bg-muted/50">
+                          <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                             {getClauseNumber(clause)}
                           </span>
                         </div>
-                        <div className="truncate text-sm font-medium leading-tight">{getClauseTitle(clause)}</div>
+                        <div className="text-sm font-medium leading-tight break-words">{getClauseTitle(clause)}</div>
                       </div>
                     </button>
                   ))}
@@ -144,6 +210,22 @@ export function ProjectNavigator({
           )}
         </div>
       </ScrollArea>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Clause</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedClause ? getClauseTitle(selectedClause) : 'this clause'}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

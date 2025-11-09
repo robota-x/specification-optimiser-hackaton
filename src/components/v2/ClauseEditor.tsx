@@ -19,22 +19,11 @@ import remarkGfm from 'remark-gfm';
 import {
   useUpdateClauseFieldValues,
   useUpdateFreeformClause,
-  useDeleteProjectClause,
 } from '@/hooks/useV2Projects';
 import type { ProjectClauseFull, FieldValues, FieldDefinition } from '@/types/v2-schema';
 import { isHybridClause, isFreeformClause, renderHybridClause } from '@/types/v2-schema';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Save } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Save } from 'lucide-react';
 
 interface ClauseEditorProps {
   projectId: string;
@@ -58,12 +47,10 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
   // UI state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Mutations
   const updateFieldValues = useUpdateClauseFieldValues();
   const updateFreeform = useUpdateFreeformClause();
-  const deleteClause = useDeleteProjectClause();
 
   // Load clause data when clause changes
   useEffect(() => {
@@ -155,32 +142,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
         description: error.message,
         variant: 'destructive',
       });
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!clause) return;
-
-    try {
-      await deleteClause.mutateAsync({
-        clauseId: clause.project_clause_id,
-        projectId,
-      });
-
-      toast({
-        title: 'Clause deleted',
-        description: 'Clause has been removed from your project',
-      });
-
-      onClauseUpdated();
-    } catch (error: any) {
-      toast({
-        title: 'Error deleting clause',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setDeleteDialogOpen(false);
     }
   };
 
@@ -298,13 +259,13 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
   if (!clause) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center px-6">
-          <div className="p-4 rounded-2xl bg-primary/10 inline-block mb-4">
-            <Package className="h-12 w-12 text-primary" />
+      <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-50 via-background to-gray-50 dark:from-slate-950/20 dark:via-background dark:to-gray-950/20">
+        <div className="text-center px-8">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-100 to-cyan-100 dark:from-emerald-900/30 dark:to-cyan-900/30 inline-block mb-4 shadow-lg">
+            <Package className="h-16 w-16 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="text-lg font-medium text-foreground mb-2">No Clause Selected</p>
-          <p className="text-sm text-muted-foreground">Select a clause from the Project Navigator to begin editing</p>
+          <p className="text-xl font-bold text-foreground mb-2 tracking-tight">No Clause Selected</p>
+          <p className="text-sm text-muted-foreground">Select a clause from the Current Project sidebar to begin editing</p>
         </div>
       </div>
     );
@@ -316,31 +277,21 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
   return (
     <div className="flex flex-col h-full">
       {/* Enhanced Header */}
-      <div className="p-6 border-b-2 border-border bg-gradient-to-r from-card to-secondary/10">
-        <div className="flex items-start justify-between mb-6">
+      <div className="p-5 border-b-2 border-border bg-gradient-to-br from-emerald-50 via-card to-cyan-50 dark:from-emerald-950/20 dark:via-card dark:to-cyan-950/20">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <div className="text-sm font-mono font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
+              <div className="text-sm font-mono font-medium px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-100 to-cyan-100 dark:from-emerald-900/40 dark:to-cyan-900/40 text-emerald-700 dark:text-emerald-300 border-2 border-emerald-300 dark:border-emerald-700 shadow-sm">
                 {isHybrid && clause.master_clause?.caws_number}
                 {isFreeform && clause.freeform_caws_number}
               </div>
-              {isHybrid && <span className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent font-medium">Master</span>}
-              {isFreeform && <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground font-medium">Custom</span>}
+              {isHybrid && <span className="text-xs px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium shadow-md">Master</span>}
+              {isFreeform && <span className="text-xs px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium shadow-md">Custom</span>}
             </div>
-            <h2 className="text-3xl font-bold text-foreground leading-tight">
+            <h2 className="text-2xl font-bold text-foreground leading-tight tracking-tight">
               {isHybrid && clause.master_clause?.title}
               {isFreeform && clause.freeform_title}
             </h2>
-          </div>
-          <div className="flex gap-2 ml-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-              className="border-2 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -367,7 +318,7 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
       {/* Content */}
       <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6">
+        <div className="p-5 space-y-6">
           {/* Hybrid Clause Editor */}
           {isHybrid && clause.master_clause && (
             <>
@@ -470,9 +421,9 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
       {/* Preview Section */}
       {(renderedPreview || (isFreeform && freeformBody)) && (
-        <div className="border-t border-border bg-muted/30">
-          <div className="p-6">
-            <h3 className="text-sm font-semibold mb-3">Preview</h3>
+        <div className="border-t-2 border-border bg-muted/30">
+          <div className="p-5">
+            <h3 className="text-base font-bold mb-3 tracking-tight">Preview</h3>
             <div className="bg-background rounded-lg border border-border p-6">
               {/* Hybrid clause preview */}
               {renderedPreview && (
@@ -497,7 +448,7 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
       )}
 
       {/* Footer */}
-      <div className="p-6 border-t border-border">
+      <div className="p-5 border-t-2 border-border">
         <div className="flex justify-end gap-2">
           <Button
             onClick={handleSave}
@@ -508,22 +459,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
           </Button>
         </div>
       </div>
-
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Clause</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this clause? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
