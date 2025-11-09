@@ -133,16 +133,6 @@ export function ProjectNavigator({
       <div className="p-5 border-b-2 border-border bg-gradient-to-br from-orange-50 via-card to-pink-50 dark:from-orange-950/20 dark:via-card dark:to-pink-950/20">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent tracking-tight">Current Project</h2>
-          {selectedClauseId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-              className="border-2 hover:bg-destructive/10 hover:border-destructive hover:text-destructive h-8 w-8 p-0"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">
@@ -176,33 +166,52 @@ export function ProjectNavigator({
               {Object.entries(groupedClauses).map(([sectionCode, { title, clauses }]) => (
                 <div key={sectionCode} className="space-y-1">
                   {/* Section header with enhanced styling */}
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-gradient-to-r from-orange-100 to-pink-100 dark:from-orange-900/30 dark:to-pink-900/30 border border-orange-200 dark:border-orange-800">
-                    <Folder className="h-4 w-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
-                    <span className="text-xs font-semibold text-orange-900 dark:text-orange-100 break-words">{title}</span>
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                    <Folder className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 break-words">{title}</span>
                   </div>
 
                   {/* Clauses in section with better hover states */}
                   {clauses.map((clause) => (
-                    <button
+                    <div
                       key={clause.project_clause_id}
-                      onClick={() => onSelectClause(clause.project_clause_id)}
                       className={cn(
-                        'w-full flex items-start gap-2 px-3 py-2 text-left rounded-lg transition-all duration-200',
-                        'hover:bg-accent/20 hover:shadow-sm hover:translate-x-0.5',
+                        'w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 group',
+                        'hover:bg-accent/20 hover:shadow-sm',
                         selectedClauseId === clause.project_clause_id &&
                           'bg-accent text-accent-foreground shadow-md border-l-2 border-accent'
                       )}
                     >
-                      <File className="h-4 w-4 mt-0.5 flex-shrink-0 text-orange-500" />
-                      <div className="flex-1 min-w-0 overflow-visible">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                            {getClauseNumber(clause)}
-                          </span>
+                      <button
+                        onClick={() => onSelectClause(clause.project_clause_id)}
+                        className="flex-1 flex items-start gap-2 text-left min-w-0"
+                      >
+                        <File className="h-4 w-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              {getClauseNumber(clause)}
+                            </span>
+                          </div>
+                          <div className="text-sm font-medium leading-tight break-words">{getClauseTitle(clause)}</div>
                         </div>
-                        <div className="text-sm font-medium leading-tight break-words">{getClauseTitle(clause)}</div>
-                      </div>
-                    </button>
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Ensure clause is selected before opening delete dialog
+                          if (selectedClauseId !== clause.project_clause_id) {
+                            onSelectClause(clause.project_clause_id);
+                          }
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               ))}

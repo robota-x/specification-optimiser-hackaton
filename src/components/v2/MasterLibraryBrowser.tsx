@@ -278,34 +278,20 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                     {isExpanded && (
                       <div className="ml-6 space-y-1">
                         {visibleClauses.map((clause) => (
-                          <div
+                          <button
                             key={clause.master_clause_id}
-                            className="flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-accent/20 border-2 border-transparent hover:border-accent/30 transition-all duration-200 group"
+                            onClick={() => handleOpenProductModal(clause)}
+                            disabled={addHybridClause.isPending}
+                            className="w-full flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-accent/20 border-2 border-transparent hover:border-accent/30 transition-all duration-200 text-left"
                           >
                             <FileText className="h-4 w-4 mt-0.5 flex-shrink-0 text-purple-500" />
-                            <div className="flex-1 min-w-0 overflow-visible">
+                            <div className="flex-1 min-w-0">
                               <div className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 inline-block mb-1">
                                 {clause.caws_number}
                               </div>
                               <div className="text-sm leading-tight font-medium break-words">{clause.title}</div>
                             </div>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-8 w-8 p-0 group-hover:opacity-100 transition-all flex-shrink-0 shadow-md opacity-60"
-                                  onClick={() => handleOpenProductModal(clause)}
-                                  disabled={addHybridClause.isPending}
-                                >
-                                  <ArrowRight className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="left">
-                                <p className="text-xs">Add "{clause.title}" to project</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
