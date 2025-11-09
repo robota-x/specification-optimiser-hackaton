@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Library, ChevronLeft, ChevronRight } from "lucid
 import type { User } from "@supabase/supabase-js";
 import { SpecContentBlock, BlockTemplate, CustomBlock, BlockValues } from "@/types/blocks";
 import { getEmptyFieldValues } from "@/lib/blockUtils";
+import { validateSpec } from "@/lib/validation";
 import {
   loadSpecContent,
   addTemplateBlock,
@@ -182,6 +183,9 @@ const SpecEditor = () => {
 
     setSaving(true);
     try {
+      // Validate spec data
+      validateSpec({ title, description });
+      
       // Save spec metadata
       const { error: specError } = await supabase
         .from("specs")
@@ -488,6 +492,7 @@ const SpecEditor = () => {
               }}
               className="text-xl font-bold border-none shadow-none focus-visible:ring-0 px-2 flex-1"
               placeholder="Specification Title"
+              maxLength={100}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -563,6 +568,7 @@ const SpecEditor = () => {
                   setHasUnsavedChanges(true);
                 }}
                 placeholder="Brief description of this specification"
+                maxLength={500}
               />
             </div>
 

@@ -105,6 +105,7 @@ export function MarkdownEditor({ value, onChange, label }: MarkdownEditorProps) 
                 onChange={(e) => onChange(e.target.value)}
                 placeholder="Write your markdown here..."
                 className="min-h-full border-none shadow-none focus-visible:ring-0 resize-none font-mono text-sm"
+                maxLength={5000}
               />
             </div>
           </ResizablePanel>
@@ -117,7 +118,7 @@ export function MarkdownEditor({ value, onChange, label }: MarkdownEditorProps) 
         </ResizablePanelGroup>
       </div>
       <p className="text-xs text-muted-foreground">
-        {value.length} characters
+        {value.length}/5000 characters
       </p>
     </div>
   );
