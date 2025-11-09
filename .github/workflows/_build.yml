@@ -8,6 +8,13 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      VITE_SUPABASE_URL:
+        required: true
+      VITE_SUPABASE_PUBLISHABLE_KEY:
+        required: true
+      VITE_SUPABASE_PROJECT_ID:
+        required: true
 
 jobs:
   build:
