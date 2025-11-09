@@ -53,6 +53,8 @@ interface Suggestion {
   savingsPercentage: number;
   costImpact: string;
   modifications: string;
+  source?: string;
+  availability?: string;
 }
 
 interface ExtractedProduct {
@@ -256,7 +258,16 @@ async function linkMaterialsToLibrary(
     throw new Error('Failed to fetch ESG material library');
   }
 
-  console.log(`Loaded ${libraryMaterials.length} materials from library`);
+  console.log(`[linkMaterialsToLibrary] Loaded ${libraryMaterials.length} materials from library`);
+  
+  // Debug: Log materials with alternatives
+  const materialsWithAlternatives = libraryMaterials.filter((m: ESGMaterial) => 
+    m.alternative_to_ids && Array.isArray(m.alternative_to_ids) && m.alternative_to_ids.length > 0
+  );
+  console.log(`[linkMaterialsToLibrary] Materials with alternative_to_ids: ${materialsWithAlternatives.length}`);
+  materialsWithAlternatives.forEach((m: ESGMaterial) => {
+    console.log(`[linkMaterialsToLibrary]   - ${m.name}: alternative_to_ids = ${JSON.stringify(m.alternative_to_ids)}`);
+  });
 
   const linkedMaterials = new Map<string, ESGMaterial>();
 
@@ -271,23 +282,24 @@ async function linkMaterialsToLibrary(
       );
 
       if (material) {
-        console.log(`✓ Direct link: ${product.manufacturer} - ${product.product_name} → ${material.name}`);
-        linkedMaterials.set(material.esg_material_id, material);
+        console.log(`[linkMaterialsToLibrary] ✓ Direct link: ${product.manufacturer} - ${product.product_name} → ${material.name} (${material.esg_material_id})`);
+        linkedMaterials.set(String(material.esg_material_id), material);
       } else {
-        console.warn(`Product ${product.product_name} has esg_material_id ${product.esg_material_id} but material not found in library`);
+        console.warn(`[linkMaterialsToLibrary] ✗ Product ${product.product_name} has esg_material_id ${product.esg_material_id} but material not found in library`);
       }
     } else {
       console.warn(`Product ${product.product_name} does not have esg_material_id - skipping direct link`);
     }
   }
 
-  console.log(`Linked ${linkedMaterials.size} materials via direct product links (Path A)`);
+  console.log(`[linkMaterialsToLibrary] Linked ${linkedMaterials.size} materials via direct product links (Path A)`);
 
   // PATH B (HARD): For each extracted material from text, find the best match using NLP
-  console.log(`Processing ${extractedMaterials.length} text-extracted materials via NLP...`);
+  console.log(`[linkMaterialsToLibrary] Processing ${extractedMaterials.length} text-extracted materials via NLP...`);
 
   for (const extracted of extractedMaterials) {
     const extractedName = extracted.material.toLowerCase().trim();
+    console.log(`[linkMaterialsToLibrary] Attempting to match: "${extracted.material}"`);
 
     // Try to find a match using NLP tags
     const match = libraryMaterials.find((lib: ESGMaterial) => {
@@ -295,6 +307,7 @@ async function linkMaterialsToLibrary(
 
       // Direct name match
       if (libName === extractedName) {
+        console.log(`[linkMaterialsToLibrary] Direct name match: "${extracted.material}" → "${lib.name}"`);
         return true;
       }
 
@@ -302,11 +315,13 @@ async function linkMaterialsToLibrary(
       if (lib.nlp_tags && lib.nlp_tags.synonyms) {
         const synonyms = lib.nlp_tags.synonyms.map((s: string) => s.toLowerCase());
         if (synonyms.includes(extractedName)) {
+          console.log(`[linkMaterialsToLibrary] Synonym match: "${extracted.material}" → "${lib.name}" (via synonym)`);
           return true;
         }
 
         // Partial match on synonyms
         if (synonyms.some((s: string) => extractedName.includes(s) || s.includes(extractedName))) {
+          console.log(`[linkMaterialsToLibrary] Partial synonym match: "${extracted.material}" → "${lib.name}"`);
           return true;
         }
       }
@@ -315,12 +330,15 @@ async function linkMaterialsToLibrary(
     });
 
     if (match) {
-      console.log(`Linked "${extracted.material}" to "${match.name}"`);
-      linkedMaterials.set(match.esg_material_id, match);
+      console.log(`[linkMaterialsToLibrary] ✓ Linked "${extracted.material}" to "${match.name}" (${match.esg_material_id})`);
+      linkedMaterials.set(String(match.esg_material_id), match);
     } else {
-      console.log(`No match found for "${extracted.material}"`);
+      console.log(`[linkMaterialsToLibrary] ✗ No match found for "${extracted.material}"`);
     }
   }
+  
+  console.log(`[linkMaterialsToLibrary] Total linked materials: ${linkedMaterials.size}`);
+  console.log(`[linkMaterialsToLibrary] Linked material IDs: ${Array.from(linkedMaterials.keys()).join(', ')}`);
 
   return linkedMaterials;
 }
@@ -347,11 +365,23 @@ async function analyzeMaterials(
   }
 
   // For each linked material, find alternatives
+  console.log(`[analyzeMaterials] Analyzing ${linkedMaterials.size} linked materials for alternatives...`);
+  
   for (const [materialId, material] of linkedMaterials) {
+    console.log(`[analyzeMaterials] Checking material: ${material.name} (${materialId})`);
+    
     // Find materials that list this material as an alternative
+    // Note: alternative_to_ids is UUID[], materialId is string, so we need to compare as strings
     const alternatives = allMaterials.filter((alt: ESGMaterial) => {
-      return alt.alternative_to_ids && alt.alternative_to_ids.includes(materialId);
+      if (!alt.alternative_to_ids || !Array.isArray(alt.alternative_to_ids) || alt.alternative_to_ids.length === 0) {
+        return false;
+      }
+      // Convert UUIDs to strings for comparison
+      const altIdsAsStrings = alt.alternative_to_ids.map(id => String(id));
+      return altIdsAsStrings.includes(String(materialId));
     });
+
+    console.log(`[analyzeMaterials] Found ${alternatives.length} alternatives for ${material.name}`);
 
     // Calculate savings for each alternative
     for (const alt of alternatives) {
@@ -359,6 +389,8 @@ async function analyzeMaterials(
       const alternativeCarbon = parseFloat(String(alt.embodied_carbon));
       const savings = currentCarbon - alternativeCarbon;
       const savingsPercentage = (savings / currentCarbon) * 100;
+
+      console.log(`[analyzeMaterials] Alternative: ${alt.name} - Current: ${currentCarbon}, Alt: ${alternativeCarbon}, Savings: ${savings}`);
 
       // Only include if there's a carbon saving
       if (savings > 0) {
@@ -372,6 +404,22 @@ async function analyzeMaterials(
           costImpact: alt.cost_impact_text || 'Unknown',
           modifications: alt.modifications_text || 'None'
         });
+        console.log(`[analyzeMaterials] ✓ Added suggestion: ${material.name} → ${alt.name} (${savings.toFixed(2)} kgCO2e savings)`);
+      } else {
+        console.log(`[analyzeMaterials] ✗ Skipped alternative ${alt.name} - no carbon saving (${savings})`);
+      }
+    }
+    
+    if (alternatives.length === 0) {
+      console.log(`[analyzeMaterials] ⚠ No alternatives found for ${material.name} - checking alternative_to_ids structure...`);
+      // Debug: check what materials have this as an alternative
+      const materialsWithThisAsAlt = allMaterials.filter((m: ESGMaterial) => {
+        if (!m.alternative_to_ids || !Array.isArray(m.alternative_to_ids)) return false;
+        return m.alternative_to_ids.some(id => String(id) === String(materialId));
+      });
+      console.log(`[analyzeMaterials] Materials that should list ${material.name} as alternative: ${materialsWithThisAsAlt.length}`);
+      if (materialsWithThisAsAlt.length > 0) {
+        console.log(`[analyzeMaterials] Found materials: ${materialsWithThisAsAlt.map(m => `${m.name} (alt_to_ids: ${JSON.stringify(m.alternative_to_ids)})`).join(', ')}`);
       }
     }
   }
@@ -382,6 +430,124 @@ async function analyzeMaterials(
   console.log(`Generated ${suggestions.length} suggestions`);
 
   return suggestions;
+}
+
+/**
+ * Search for lower-carbon alternatives using Google Search grounding
+ * This replaces the static library lookup with real-time web search
+ */
+async function searchForAlternatives(
+  geminiApiKey: string,
+  linkedMaterials: Map<string, ESGMaterial>
+): Promise<Suggestion[]> {
+  console.log('[searchForAlternatives] Searching for lower-carbon alternatives via Google Search...');
+
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    tools: [{ googleSearch: {} }]
+  });
+
+  // Build a comprehensive prompt that instructs the model to search for alternatives
+  const materialsList = Array.from(linkedMaterials.values())
+    .map((m, i) => `${i + 1}. ${m.name} (${m.embodied_carbon} ${m.carbon_unit})`)
+    .join('\n');
+
+  const prompt = `You are an expert ESG (Environmental, Social, Governance) consultant specializing in construction materials and embodied carbon reduction.
+
+I need you to search the web for lower-carbon alternatives to the following construction materials currently specified in a project:
+
+MATERIALS TO ANALYZE:
+${materialsList}
+
+YOUR TASK:
+1. **For EACH material above, perform a well-tuned Google Search** to find:
+   - Lower-carbon alternative materials or products
+   - Actual embodied carbon values (kgCO2e) from reliable sources (EPDs, LCA databases, manufacturer data)
+   - Real-world products and suppliers available in the UK market
+   - Cost implications and technical considerations
+
+2. **Search Strategy:**
+   - Use specific search queries like: "[Material Name] low carbon alternative embodied carbon UK"
+   - Search for: "[Material Name] EPD LCA embodied carbon"
+   - Look for: "sustainable [Material Name] alternatives construction UK"
+   - Find actual product data from manufacturers, EC3 database, ICE database, or similar authoritative sources
+
+3. **For each alternative found, provide:**
+   - Material/product name
+   - Embodied carbon value (kgCO2e) with unit
+   - Source/authority (EPD, manufacturer, database)
+   - Carbon savings compared to current material
+   - Cost impact (if available)
+   - Technical modifications required (if any)
+   - Availability in UK market
+
+4. **Focus on:**
+   - Real, available products (not theoretical)
+   - Verified carbon data from EPDs or LCA studies
+   - Practical alternatives that can be specified in UK construction projects
+   - Materials that offer genuine carbon savings (at least 10% reduction)
+
+OUTPUT FORMAT (JSON only):
+Return a JSON array with this structure:
+[
+  {
+    "currentMaterial": "Portland Cement (CEM I)",
+    "currentCarbon": 820.0,
+    "alternativeMaterial": "Ground Granulated Blast-furnace Slag Cement (CEM III/A)",
+    "alternativeCarbon": 270.0,
+    "savings": 550.0,
+    "savingsPercentage": 67.1,
+    "costImpact": "5-10% cost increase",
+    "modifications": "Requires careful curing in cold weather. May require extended curing times.",
+    "source": "ICE Database v3.0 / Manufacturer EPD",
+    "availability": "Widely available in UK market"
+  }
+]
+
+IMPORTANT:
+- Perform actual web searches using Google Search to find real, current data
+- Only include alternatives with verified carbon savings
+- Prioritize alternatives with the highest carbon reduction potential
+- Return ONLY the JSON array, no additional text or markdown formatting`;
+
+  try {
+    console.log('[searchForAlternatives] Calling Gemini API with Google Search grounding...');
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }]
+    });
+    const response = result.response;
+    const text = response.text();
+    
+    // Check for grounding metadata
+    const groundingMetadata = (response as any).groundingMetadata;
+    if (groundingMetadata) {
+      console.log('[searchForAlternatives] Google Search was used - queries:', groundingMetadata.webSearchQueries);
+      console.log('[searchForAlternatives] Sources found:', groundingMetadata.groundingChunks?.length || 0);
+    } else {
+      console.log('[searchForAlternatives] Warning: No grounding metadata - model may not have used Google Search');
+    }
+
+    console.log('[searchForAlternatives] Gemini response received, parsing...');
+
+    // Clean up and parse JSON
+    const cleanedText = text
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    const suggestions = JSON.parse(cleanedText);
+    console.log(`[searchForAlternatives] Found ${suggestions.length} alternatives via web search`);
+
+    // Sort by savings (highest first)
+    suggestions.sort((a: Suggestion, b: Suggestion) => b.savings - a.savings);
+
+    return suggestions;
+  } catch (error) {
+    console.error('[searchForAlternatives] Error searching for alternatives:', error);
+    throw error;
+  }
 }
 
 /**
@@ -402,62 +568,112 @@ async function generateESGReport(
 
   const prompt = `You are an expert ESG (Environmental, Social, Governance) consultant specializing in construction and embodied carbon reduction.
 
-You have analyzed the specification for "${projectName}" and identified opportunities to reduce embodied carbon through material substitutions.
+You have analyzed the specification for "${projectName}" and identified opportunities to reduce embodied carbon through material substitutions. The alternatives were found through web search of current EPDs, LCA databases, and manufacturer data.
 
 ANALYSIS DATA:
-- Total current embodied carbon: ${totalCurrentCarbon.toFixed(2)} kgCO2e
-- Total potential savings: ${totalPotentialSavings.toFixed(2)} kgCO2e (${((totalPotentialSavings / totalCurrentCarbon) * 100).toFixed(1)}% reduction)
+- Total potential carbon reduction: ${((totalPotentialSavings / totalCurrentCarbon) * 100).toFixed(1)}% (percentage only)
 - Materials analyzed: ${suggestions.length}
 - Improvement opportunities identified: ${suggestions.length}
 
 TOP OPPORTUNITIES (sorted by impact):
 ${suggestions.slice(0, 5).map((s, i) => `
-${i + 1}. Replace "${s.currentMaterial}" (${s.currentCarbon.toFixed(2)} kgCO2e) with "${s.alternativeMaterial}" (${s.alternativeCarbon.toFixed(2)} kgCO2e)
-   - Savings: ${s.savings.toFixed(2)} kgCO2e (${s.savingsPercentage.toFixed(1)}% reduction)
+${i + 1}. Replace "${s.currentMaterial}" with "${s.alternativeMaterial}"
+   - Carbon reduction: ${s.savingsPercentage.toFixed(1)}% (percentage only - do not include absolute kg values)
    - Cost impact: ${s.costImpact}
    - Modifications required: ${s.modifications}
+   ${(s as any).source ? `- Source: ${(s as any).source}` : ''}
+   ${(s as any).availability ? `- Availability: ${(s as any).availability}` : ''}
 `).join('\n')}
 
 YOUR TASK:
-Write a professional ESG report for the project team. The report should:
+Write a professional ESG report focused solely on material replacement recommendations for CO2 and environmental impact reduction. Use Google Search if you need to verify any information or find additional context.
+
+CRITICAL REQUIREMENTS:
+1. **Exactly 3 recommendations maximum** - one per material/component type
+2. **Use percentages only** - never include absolute kgCO2e values, only percentage reductions
+3. **Additional opportunities** - only list other replacement options for the same materials/components
+4. **No next steps, implementation advice, or action items** - only material replacement suggestions
+
+The report should include:
 
 1. **Executive Summary** (2-3 sentences)
-2. **Top 3 Recommendations** (detailed)
-3. **Additional Opportunities** (brief list)
-4. **Next Steps**
+   - Overall potential carbon reduction (as percentage only)
+   - Key message about material replacement opportunities
+
+2. **Top Recommendations** (exactly 3 or fewer, one per component type)
+   For each recommendation include:
+   - Material/component to replace
+   - Alternative material/product name
+   - Carbon reduction percentage (NOT absolute kg values)
+   - Brief description of the alternative and why it reduces impact
+   - Cost impact (if available)
+   - Source/authority for the carbon data (EPD, manufacturer, database)
+
+3. **Additional Opportunities** (optional)
+   - Only other replacement options for the same materials/components already covered
+   - List alternative materials that could replace the same components
+   - Include percentage reduction for each
+   - Do NOT include new component types - only variations of replacements
+
+TONE & STYLE:
+- Professional but accessible
+- Focus exclusively on material replacements
+- Use UK construction terminology and standards
+- Use percentages only - never absolute kgCO2e values
+- Reference sources when available
 
 OUTPUT FORMAT:
 Return your response as a JSON object with this structure:
 {
-  "title": "ESG Analysis: ${projectName}",
-  "summary": "Brief executive summary paragraph",
+  "title": "Single sentence describing the material replacement opportunities (e.g., 'Three material substitutions can reduce embodied carbon by X%')",
+  "summary": "Brief executive summary paragraph (percentages only, no absolute values)",
   "topRecommendations": [
     {
-      "title": "Recommendation title",
-      "description": "Detailed explanation",
-      "savings": "X kgCO2e (Y% reduction)",
-      "costImpact": "Cost implications",
-      "difficulty": "easy|moderate|complex"
+      "title": "Recommendation title (material/component type)",
+      "description": "Brief explanation of the replacement (1-2 paragraphs, use markdown for formatting)",
+      "savings": "Y% reduction (percentage only, no kg values)",
+      "costImpact": "Cost implications (if available)",
+      "source": "Source of carbon data (EPD, manufacturer, database)"
     }
   ],
   "additionalOpportunities": [
     {
-      "title": "Brief opportunity description",
-      "savings": "X kgCO2e"
+      "title": "Alternative material name for same component",
+      "savings": "Y% reduction (percentage only)"
     }
-  ],
-  "nextSteps": "Markdown-formatted list of next steps"
+  ]
 }
 
-IMPORTANT: Return ONLY the JSON object. Do not include any explanatory text, markdown code blocks, or formatting outside the JSON.`;
+IMPORTANT: 
+- Title must be a single sentence (not "ESG Analysis: Project Name" format)
+- Maximum 3 recommendations, one per component/material type
+- Use percentages ONLY - never include absolute kgCO2e values
+- Additional opportunities are only other replacement options for the same components
+- Do NOT include "nextSteps" or any implementation guidance
+- Focus solely on material replacements for CO2/environmental impact reduction
+- Use Google Search if you need to verify information
+- Return ONLY the JSON object. Do not include any explanatory text, markdown code blocks, or formatting outside the JSON.`;
 
-  const result = await model.generateContent(prompt);
-  const response = result.response.text();
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    tools: [{ googleSearch: {} }]
+  });
+  const response = result.response;
+  const text = response.text();
+  
+  // Check for grounding metadata
+  const groundingMetadata = (response as any).groundingMetadata;
+  if (groundingMetadata) {
+    console.log('[generateESGReport] Google Search was used - queries:', groundingMetadata.webSearchQueries);
+    console.log('[generateESGReport] Sources found:', groundingMetadata.groundingChunks?.length || 0);
+  } else {
+    console.log('[generateESGReport] Note: No grounding metadata in response');
+  }
 
   console.log('[generateESGReport] Gemini response received, parsing...');
 
   // Clean up the response and parse JSON
-  const cleanedText = response
+  const cleanedText = text
     .replace(/```json\s*/g, '')
     .replace(/```\s*/g, '')
     .trim();
@@ -483,32 +699,35 @@ async function saveESGReport(
     .is('source_clause_id', null);
 
   // Build the narrative from the report
-  let narrative = `# ${report.summary}\n\n`;
+  let narrative = `# ${report.title || 'ESG Analysis'}\n\n`;
+  narrative += `${report.summary}\n\n`;
 
   if (report.topRecommendations && report.topRecommendations.length > 0) {
     narrative += `## Top Recommendations\n\n`;
-    for (let i = 0; i < report.topRecommendations.length; i++) {
-      const rec = report.topRecommendations[i];
+    // Limit to exactly 3 recommendations maximum
+    const recommendations = report.topRecommendations.slice(0, 3);
+    for (let i = 0; i < recommendations.length; i++) {
+      const rec = recommendations[i];
       narrative += `### ${i + 1}. ${rec.title}\n\n`;
       narrative += `${rec.description}\n\n`;
-      narrative += `**Savings:** ${rec.savings}\n\n`;
-      narrative += `**Cost Impact:** ${rec.costImpact}\n\n`;
-      narrative += `**Difficulty:** ${rec.difficulty}\n\n`;
+      narrative += `**Carbon Reduction:** ${rec.savings}\n\n`;
+      if (rec.costImpact) {
+        narrative += `**Cost Impact:** ${rec.costImpact}\n\n`;
+      }
+      if (rec.source) {
+        narrative += `**Source:** ${rec.source}\n\n`;
+      }
       narrative += `---\n\n`;
     }
   }
 
   if (report.additionalOpportunities && report.additionalOpportunities.length > 0) {
     narrative += `## Additional Opportunities\n\n`;
+    narrative += `Other replacement options for the same materials/components:\n\n`;
     for (const opp of report.additionalOpportunities) {
       narrative += `- ${opp.title} (${opp.savings})\n`;
     }
     narrative += `\n`;
-  }
-
-  if (report.nextSteps) {
-    narrative += `## Next Steps\n\n`;
-    narrative += report.nextSteps;
   }
 
   // Insert the new report
@@ -729,10 +948,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Step B (continued): Analyze and find alternatives
-      console.log('[run-analysis-job] Step B (continued): Analyzing materials and finding alternatives...');
-      const suggestions = await analyzeMaterials(supabase, linkedMaterials);
-      console.log(`[run-analysis-job] Generated ${suggestions.length} suggestions`);
+      // Step B (continued): Search for alternatives using Google Search
+      console.log('[run-analysis-job] Step B (continued): Searching for lower-carbon alternatives via Google Search...');
+      let suggestions: Suggestion[];
+      
+      try {
+        // Use Google Search to find real-time alternatives
+        suggestions = await searchForAlternatives(geminiApiKey, linkedMaterials);
+        console.log(`[run-analysis-job] Found ${suggestions.length} alternatives via web search`);
+      } catch (searchError) {
+        console.error('[run-analysis-job] Error in web search, falling back to library lookup:', searchError);
+        // Fallback to static library if search fails
+        suggestions = await analyzeMaterials(supabase, linkedMaterials);
+        console.log(`[run-analysis-job] Fallback: Generated ${suggestions.length} suggestions from library`);
+      }
 
       if (suggestions.length === 0) {
         // No suggestions - all materials are already optimal
