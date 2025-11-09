@@ -481,21 +481,58 @@ async function saveESGReport(
  * Main handler
  */
 Deno.serve(async (req) => {
+  console.log('[run-analysis-job] Request received:', req.method, req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('[run-analysis-job] CORS preflight request');
     return new Response('ok', { headers: corsHeaders });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  console.log('[run-analysis-job] Supabase client initialized');
+
+  // Validate authentication - accept service role key (internal calls)
+  const authHeader = req.headers.get('Authorization');
+  const apikeyHeader = req.headers.get('apikey');
+  
+  console.log('[run-analysis-job] Checking authentication...');
+  const isServiceRoleAuth = authHeader?.includes(supabaseServiceKey) || apikeyHeader === supabaseServiceKey;
+  
+  if (!isServiceRoleAuth && !authHeader) {
+    console.error('[run-analysis-job] Missing authorization - requires service role key for internal calls');
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - service role key required' }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  if (!isServiceRoleAuth) {
+    console.error('[run-analysis-job] Invalid authorization - service role key mismatch');
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - invalid service role key' }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  console.log('[run-analysis-job] Service role authentication validated');
 
   try {
     // Parse request body
+    console.log('[run-analysis-job] Parsing request body...');
     const requestBody = await req.json() as RunAnalysisRequest;
     const { job_id, project_id } = requestBody;
 
     if (!job_id || !project_id) {
+      console.error('[run-analysis-job] Missing required fields - job_id:', job_id, 'project_id:', project_id);
       return new Response(
         JSON.stringify({ error: 'Missing required fields: job_id, project_id' }),
         {
@@ -505,16 +542,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Starting analysis job ${job_id} for project ${project_id}`);
+    console.log(`[run-analysis-job] Starting analysis job ${job_id} for project ${project_id}`);
 
     // Update job status to running
+    console.log(`[run-analysis-job] Updating job ${job_id} status to 'running'...`);
     await supabase
       .from('project_analysis_job')
       .update({ status: 'running' })
       .eq('job_id', job_id);
+    console.log(`[run-analysis-job] Job ${job_id} status updated to 'running'`);
 
     try {
       // Get project name
+      console.log(`[run-analysis-job] Fetching project ${project_id}...`);
       const { data: project, error: projectError } = await supabase
         .from('project')
         .select('project_name')
@@ -522,17 +562,20 @@ Deno.serve(async (req) => {
         .single();
 
       if (projectError || !project) {
+        console.error(`[run-analysis-job] Project not found:`, projectError?.message);
         throw new Error('Project not found');
       }
 
       const projectName = project.project_name || 'Untitled Project';
+      console.log(`[run-analysis-job] Project name: ${projectName}`);
 
       // Step A: Extract materials from project (both products and text)
-      console.log('Step A: Extracting project content (products + text)...');
+      console.log('[run-analysis-job] Step A: Extracting project content (products + text)...');
       const extractionResult = await extractProjectContent(supabase, project_id);
+      console.log(`[run-analysis-job] Extraction complete - products: ${extractionResult.products.length}, text length: ${extractionResult.text.length}`);
 
       if ((!extractionResult.text || extractionResult.text.trim().length === 0) && extractionResult.products.length === 0) {
-        console.log('No content found in project (no text and no products)');
+        console.log('[run-analysis-job] No content found in project (no text and no products)');
 
         // Create a "no content" report
         await supabase
@@ -571,27 +614,27 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Extracted ${extractionResult.products.length} products and ${extractionResult.text.length} characters of text`);
+      console.log(`[run-analysis-job] Extracted ${extractionResult.products.length} products and ${extractionResult.text.length} characters of text`);
 
       // Step A (continued): Call LLM for text-based material extraction (Path B)
       let extractedMaterials: ExtractedMaterial[] = [];
 
       if (extractionResult.text && extractionResult.text.trim().length > 0) {
-        console.log('Step A: Calling LLM for text-based material extraction (Path B)...');
+        console.log('[run-analysis-job] Step A (continued): Calling LLM for text-based material extraction (Path B)...');
         extractedMaterials = await callLLMExtraction(supabaseUrl, supabaseServiceKey, extractionResult.text);
-        console.log(`Extracted ${extractedMaterials.length} materials from text via NLP`);
+        console.log(`[run-analysis-job] Extracted ${extractedMaterials.length} materials from text via NLP`);
       } else {
-        console.log('No text content to extract - skipping LLM call');
+        console.log('[run-analysis-job] No text content to extract - skipping LLM call');
       }
 
       // Step B: Link materials to library (both Path A products and Path B text)
-      console.log('Step B: Linking materials to library...');
+      console.log('[run-analysis-job] Step B: Linking materials to library...');
       const linkedMaterials = await linkMaterialsToLibrary(
         supabase,
         extractedMaterials,
         extractionResult.products
       );
-      console.log(`Linked ${linkedMaterials.size} total materials to library`);
+      console.log(`[run-analysis-job] Linked ${linkedMaterials.size} total materials to library`);
 
       if (linkedMaterials.size === 0) {
         // No materials found - create a report saying so
@@ -632,8 +675,9 @@ Deno.serve(async (req) => {
       }
 
       // Step B (continued): Analyze and find alternatives
-      console.log('Step B: Analyzing materials and finding alternatives...');
+      console.log('[run-analysis-job] Step B (continued): Analyzing materials and finding alternatives...');
       const suggestions = await analyzeMaterials(supabase, linkedMaterials);
+      console.log(`[run-analysis-job] Generated ${suggestions.length} suggestions`);
 
       if (suggestions.length === 0) {
         // No suggestions - all materials are already optimal
@@ -674,14 +718,17 @@ Deno.serve(async (req) => {
       }
 
       // Step C: Generate ESG report
-      console.log('Step C: Generating ESG report...');
+      console.log('[run-analysis-job] Step C: Generating ESG report...');
       const report = await generateESGReport(supabaseUrl, supabaseServiceKey, projectName, suggestions);
+      console.log('[run-analysis-job] ESG report generated successfully');
 
       // Step D: Save the report
-      console.log('Step D: Saving ESG report...');
+      console.log('[run-analysis-job] Step D: Saving ESG report...');
       await saveESGReport(supabase, project_id, report);
+      console.log('[run-analysis-job] ESG report saved to database');
 
       // Mark job as complete
+      console.log(`[run-analysis-job] Marking job ${job_id} as complete...`);
       await supabase
         .from('project_analysis_job')
         .update({
@@ -690,7 +737,7 @@ Deno.serve(async (req) => {
         })
         .eq('job_id', job_id);
 
-      console.log(`Analysis job ${job_id} completed successfully`);
+      console.log(`[run-analysis-job] Analysis job ${job_id} completed successfully`);
 
       return new Response(
         JSON.stringify({
@@ -704,9 +751,10 @@ Deno.serve(async (req) => {
       );
 
     } catch (analysisError) {
-      console.error('Analysis error:', analysisError);
+      console.error('[run-analysis-job] Analysis error:', analysisError);
 
       // Mark job as failed
+      console.error(`[run-analysis-job] Marking job ${job_id} as failed...`);
       await supabase
         .from('project_analysis_job')
         .update({
@@ -720,7 +768,7 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('[run-analysis-job] Unexpected error:', error);
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
