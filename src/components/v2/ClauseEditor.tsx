@@ -21,7 +21,7 @@ import {
   useUpdateFreeformClause,
   useDeleteProjectClause,
 } from '@/hooks/useV2Projects';
-import type { ProjectClauseFull, FieldValues, FieldDefinition, Product } from '@/types/v2-schema';
+import type { ProjectClauseFull, FieldValues, FieldDefinition } from '@/types/v2-schema';
 import { isHybridClause, isFreeformClause, renderHybridClause } from '@/types/v2-schema';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Save } from 'lucide-react';
@@ -35,7 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ProductBrowser } from './ProductBrowser';
 
 interface ClauseEditorProps {
   projectId: string;
@@ -60,7 +59,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
   // UI state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [productBrowserOpen, setProductBrowserOpen] = useState(false);
 
   // Mutations
   const updateFieldValues = useUpdateClauseFieldValues();
@@ -183,44 +181,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
       });
     } finally {
       setDeleteDialogOpen(false);
-    }
-  };
-
-  const handleProductSelect = async (product: Product) => {
-    if (!clause || !isHybridClause(clause)) return;
-
-    try {
-      // Merge product data with existing field values
-      const updatedFieldValues: FieldValues = {
-        ...fieldValues,
-        ...product.product_data,
-        // Store the selected product ID for tracking
-        selected_product_id: product.product_id,
-      };
-
-      // Update local state
-      setFieldValues(updatedFieldValues);
-      setHasUnsavedChanges(true);
-
-      // Immediately save to database
-      await updateFieldValues.mutateAsync({
-        clauseId: clause.project_clause_id,
-        fieldValues: updatedFieldValues,
-      });
-
-      toast({
-        title: 'Product selected',
-        description: `${product.manufacturer} - ${product.product_name} has been applied`,
-      });
-
-      setHasUnsavedChanges(false);
-      onClauseUpdated();
-    } catch (error: any) {
-      toast({
-        title: 'Error applying product',
-        description: error.message,
-        variant: 'destructive',
-      });
     }
   };
 
@@ -383,23 +343,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
             </Button>
           </div>
         </div>
-
-        {/* Product Library Button (Hybrid clauses only) */}
-        {isHybrid && clause.master_clause && (
-          <div className="mb-4">
-            <Button
-              variant="secondary"
-              onClick={() => setProductBrowserOpen(true)}
-              className="w-full h-11 border-2 hover:border-accent"
-            >
-              <Package className="h-5 w-5 mr-2" />
-              Browse Product Library
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-              Select a manufacturer product to auto-fill the specification fields
-            </p>
-          </div>
-        )}
 
         {hasUnsavedChanges && (
           <div className="flex items-center justify-between bg-accent/10 border-2 border-accent/30 rounded-lg px-4 py-3">
@@ -581,18 +524,6 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Product Browser Modal */}
-      {isHybrid && clause.master_clause && (
-        <ProductBrowser
-          open={productBrowserOpen}
-          onOpenChange={setProductBrowserOpen}
-          masterClauseId={clause.master_clause.master_clause_id}
-          cawsNumber={clause.master_clause.caws_number}
-          clauseTitle={clause.master_clause.title}
-          onProductSelect={handleProductSelect}
-        />
-      )}
     </div>
   );
 }

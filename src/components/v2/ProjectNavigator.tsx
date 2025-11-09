@@ -87,7 +87,7 @@ export function ProjectNavigator({
     <div className="flex flex-col h-full">
       {/* Header with enhanced styling */}
       <div className="p-4 border-b-2 border-border bg-gradient-to-r from-card to-secondary/10">
-        <h2 className="text-base font-bold text-foreground">Project Navigator</h2>
+        <h2 className="text-base font-bold text-foreground">Current Project</h2>
         <div className="flex items-center gap-2 mt-1">
           <div className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium">
             {clauses.length} {clauses.length === 1 ? 'clause' : 'clauses'}

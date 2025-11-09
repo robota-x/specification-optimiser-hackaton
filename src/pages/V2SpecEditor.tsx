@@ -1,6 +1,6 @@
 /**
  * V2 Spec Editor - Three-panel CAWS builder
- * Layout: Project Navigator | Master Library | Clause Editor
+ * Layout: Master Library | Project Navigator | Clause Editor
  */
 
 import { useEffect, useState } from 'react';
@@ -242,25 +242,22 @@ export default function V2SpecEditor() {
 
         {/* Editor Tab - Three-panel layout with refined borders */}
         <TabsContent value="editor" className="flex-1 flex overflow-hidden m-0">
-          {/* Left Sidebar: Project Navigator (top) + Master Library (bottom) */}
-          <aside className="w-96 border-r-2 border-border bg-card flex flex-col shadow-sm">
-            {/* Top half: Project Navigator */}
-            <div className="flex-1 overflow-y-auto border-b-2 border-border">
-              <ProjectNavigator
-                projectId={project.project_id}
-                clauses={clauses}
-                selectedClauseId={selectedClauseId}
-                onSelectClause={handleSelectClause}
-              />
-            </div>
+          {/* Left Sidebar: Master Library */}
+          <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
+            <MasterLibraryBrowser
+              projectId={project.project_id}
+              masterLibrary={masterLibrary}
+            />
+          </aside>
 
-            {/* Bottom half: Master Library */}
-            <div className="flex-1 overflow-y-auto">
-              <MasterLibraryBrowser
-                projectId={project.project_id}
-                masterLibrary={masterLibrary}
-              />
-            </div>
+          {/* Middle Sidebar: Project Navigator */}
+          <aside className="w-80 border-r-2 border-border bg-card overflow-y-auto shadow-sm">
+            <ProjectNavigator
+              projectId={project.project_id}
+              clauses={clauses}
+              selectedClauseId={selectedClauseId}
+              onSelectClause={handleSelectClause}
+            />
           </aside>
 
           {/* Right: Clause Editor (full width) */}
