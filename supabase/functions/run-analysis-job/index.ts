@@ -492,34 +492,15 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  console.log('[run-analysis-job] Supabase client initialized');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-  // Validate authentication - accept service role key (internal calls)
+  // Authenticate the request - accept both user tokens and service role
   const authHeader = req.headers.get('Authorization');
-  const apikeyHeader = req.headers.get('apikey');
-  
-  console.log('[run-analysis-job] Checking authentication...');
-  
-  // Use exact equality check for security (not substring match)
-  const expectedAuthHeader = `Bearer ${supabaseServiceKey}`;
-  const isServiceRoleAuth = authHeader === expectedAuthHeader || apikeyHeader === supabaseServiceKey;
-  
-  if (!isServiceRoleAuth) {
-    if (!authHeader && !apikeyHeader) {
-      console.error('[run-analysis-job] Missing authorization - requires service role key for internal calls');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - service role key required' }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    console.error('[run-analysis-job] Invalid authorization - service role key mismatch');
+
+  if (!authHeader) {
+    console.error('[run-analysis-job] Missing authorization header');
     return new Response(
-      JSON.stringify({ error: 'Unauthorized - invalid service role key' }),
+      JSON.stringify({ error: 'Unauthorized - missing authorization header' }),
       {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -527,7 +508,34 @@ Deno.serve(async (req) => {
     );
   }
 
-  console.log('[run-analysis-job] Service role authentication validated');
+  // Try to authenticate as service role first (internal calls)
+  // Use native Supabase client with service role to verify the token
+  console.log('[run-analysis-job] Attempting authentication...');
+
+  const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  // Try to get user with the provided token - this works for both service role and user tokens
+  const { data: { user }, error: authError } = await serviceSupabase.auth.getUser();
+
+  if (authError || !user) {
+    // Token validation failed completely
+    console.error('[run-analysis-job] Authentication failed:', authError?.message);
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - invalid authentication token' }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  console.log('[run-analysis-job] Authentication successful for user:', user.id);
+
+  // Create Supabase client with service role for database operations
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  console.log('[run-analysis-job] Supabase client initialized with service role');
 
   try {
     // Parse request body

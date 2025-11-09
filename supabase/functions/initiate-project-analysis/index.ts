@@ -189,29 +189,20 @@ Deno.serve(async (req) => {
     // Invoke the run-analysis-job function asynchronously
     // Note: This is a fire-and-forget call. We don't wait for the response.
     try {
-      const runAnalysisUrl = `${supabaseUrl}/functions/v1/run-analysis-job`;
-      console.log(`[initiate-project-analysis] Invoking run-analysis-job at: ${runAnalysisUrl}`);
+      console.log(`[initiate-project-analysis] Invoking run-analysis-job for job ${newJob.job_id}`);
 
-      // Use apikey header for service role authentication
-      fetch(runAnalysisUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseServiceKey,
-          'Authorization': `Bearer ${supabaseServiceKey}`
-        },
-        body: JSON.stringify({
+      // Use Supabase client to invoke function (handles auth properly)
+      supabase.functions.invoke('run-analysis-job', {
+        body: {
           job_id: newJob.job_id,
           project_id: project_id
-        })
-      }).then(response => {
-        console.log(`[initiate-project-analysis] run-analysis-job response status: ${response.status}`);
-        if (!response.ok) {
-          return response.text().then(text => {
-            console.error(`[initiate-project-analysis] run-analysis-job failed: ${response.status} - ${text}`);
-          });
         }
-        console.log('[initiate-project-analysis] run-analysis-job invoked successfully');
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('[initiate-project-analysis] run-analysis-job failed:', error);
+        } else {
+          console.log('[initiate-project-analysis] run-analysis-job invoked successfully:', data);
+        }
       }).catch(error => {
         console.error('[initiate-project-analysis] Failed to invoke run-analysis-job:', error);
       });
