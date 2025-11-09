@@ -138,13 +138,19 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
-        <div className="p-3 border-b border-border space-y-2">
+        {/* Header with enhanced styling */}
+        <div className="p-4 border-b-2 border-border space-y-3 bg-gradient-to-r from-card to-secondary/10">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Master Library</h2>
+            <h2 className="text-base font-bold text-foreground">Master Library</h2>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={handleOpenFreeformDialog}>
-                  <Plus className="h-3 w-3 mr-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOpenFreeformDialog}
+                  className="border-2 hover:bg-accent/20 hover:border-accent"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
                   Custom
                 </Button>
               </TooltipTrigger>
@@ -153,24 +159,28 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
           </div>
 
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search..."
+              placeholder="Search clauses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-7 h-8 text-sm"
+              className="pl-9 h-10 text-sm border-2 focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </div>
         </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-2">
+        <div className="p-3">
           {!filteredLibrary || filteredLibrary.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No clauses found</p>
+            <div className="text-center py-12 px-4">
+              <div className="p-3 rounded-xl bg-muted/50 inline-block mb-3">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">No clauses found</p>
+              <p className="text-xs text-muted-foreground">Try a different search term</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {filteredLibrary.map((section) => {
                 const isExpanded = expandedSections.has(section.work_section_id);
                 const visibleClauses = searchQuery
@@ -187,52 +197,52 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
 
                 return (
                   <div key={section.work_section_id} className="space-y-1">
-                    {/* Section header */}
+                    {/* Section header with enhanced styling */}
                     <button
                       onClick={() => toggleSection(section.work_section_id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg hover:bg-accent/20 transition-all duration-200 border-2 border-transparent hover:border-accent/30"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-primary" />
                       ) : (
-                        <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                        <ChevronRight className="h-4 w-4 flex-shrink-0 text-primary" />
                       )}
-                      <span className="font-mono text-xs text-muted-foreground">
+                      <span className="font-mono text-xs font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                         {section.caws_code}
                       </span>
-                      <span className="flex-1 truncate text-xs">{section.title}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="flex-1 truncate text-sm font-medium">{section.title}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
                         {section.clauses.length}
                       </span>
                     </button>
 
-                    {/* Clauses in section */}
+                    {/* Clauses in section with enhanced hover */}
                     {isExpanded && (
-                      <div className="ml-4 space-y-0.5">
+                      <div className="ml-6 space-y-1">
                         {visibleClauses.map((clause) => (
                           <div
                             key={clause.master_clause_id}
-                            className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 group"
+                            className="flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-accent/20 border-2 border-transparent hover:border-accent/30 transition-all duration-200 group"
                           >
-                            <FileText className="h-3 w-3 mt-1 flex-shrink-0 text-muted-foreground" />
+                            <FileText className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs text-muted-foreground font-mono">
+                              <div className="text-xs font-mono font-medium px-1.5 py-0.5 rounded bg-muted/50 inline-block mb-1">
                                 {clause.caws_number}
                               </div>
-                              <div className="text-xs leading-tight">{clause.title}</div>
+                              <div className="text-sm leading-tight font-medium">{clause.title}</div>
                             </div>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:bg-accent hover:text-accent-foreground"
                                   onClick={() =>
                                     handleAddMasterClause(clause.master_clause_id, clause.title)
                                   }
                                   disabled={addHybridClause.isPending}
                                 >
-                                  <Plus className="h-3 w-3" />
+                                  <Plus className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="left">
@@ -251,19 +261,19 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
         </div>
       </ScrollArea>
 
-        {/* Freeform Clause Dialog */}
+        {/* Freeform Clause Dialog with enhanced styling */}
         <Dialog open={freeformDialogOpen} onOpenChange={setFreeformDialogOpen}>
-        <DialogContent>
+        <DialogContent className="border-2">
           <DialogHeader>
-            <DialogTitle>Add Custom Clause</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl">Add Custom Clause</DialogTitle>
+            <DialogDescription className="text-base">
               Create a freeform clause that's not part of the master library
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="caws_number">CAWS Number *</Label>
+              <Label htmlFor="caws_number" className="text-sm font-semibold">CAWS Number *</Label>
               <Input
                 id="caws_number"
                 value={freeformData.cawsNumber}
@@ -271,38 +281,42 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                   setFreeformData((prev) => ({ ...prev, cawsNumber: e.target.value }))
                 }
                 placeholder="e.g., F10/999"
+                className="h-11 border-2"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
+              <Label htmlFor="title" className="text-sm font-semibold">Title *</Label>
               <Input
                 id="title"
                 value={freeformData.title}
                 onChange={(e) => setFreeformData((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="e.g., Custom Specification Requirement"
+                className="h-11 border-2"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="body">Content (Markdown supported)</Label>
+              <Label htmlFor="body" className="text-sm font-semibold">Content (Markdown supported)</Label>
               <Textarea
                 id="body"
                 value={freeformData.body}
                 onChange={(e) => setFreeformData((prev) => ({ ...prev, body: e.target.value }))}
                 placeholder="Enter the clause content..."
                 rows={8}
+                className="border-2 resize-none"
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFreeformDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setFreeformDialogOpen(false)} className="border-2">
               Cancel
             </Button>
             <Button
               onClick={handleAddFreeformClause}
               disabled={addFreeformClause.isPending}
+              className="shadow-md"
             >
               Add Clause
             </Button>

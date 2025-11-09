@@ -149,9 +149,11 @@ export default function V2SpecEditor() {
   if (projectLoading || clausesLoading || libraryLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <p className="text-muted-foreground">Loading project...</p>
+        <div className="flex flex-col items-center gap-4">
+          <div className="p-4 rounded-2xl bg-primary/10">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          </div>
+          <p className="text-lg text-muted-foreground font-medium">Loading project...</p>
         </div>
       </div>
     );
@@ -161,8 +163,11 @@ export default function V2SpecEditor() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Project not found</p>
-          <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+          <p className="text-lg text-muted-foreground mb-6">Project not found</p>
+          <Button onClick={() => navigate('/dashboard')} size="lg" className="h-11 px-6">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
         </div>
       </div>
     );
@@ -172,35 +177,47 @@ export default function V2SpecEditor() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background z-10">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+      {/* Professional Header with enhanced visual hierarchy */}
+      <header className="border-b-2 border-border sticky top-0 bg-card/95 backdrop-blur-sm z-10 shadow-sm">
+        <div className="px-6 py-3 flex justify-between items-center gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/dashboard')}
+              className="border-2 hover:bg-secondary/50"
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="border-l border-border h-6"></div>
+            <div className="border-l-2 border-border h-8"></div>
             <Input
               value={projectName}
               onChange={(e) => {
                 setProjectName(e.target.value);
                 setHasUnsavedChanges(true);
               }}
-              className="text-xl font-bold border-none shadow-none focus-visible:ring-0 px-2 flex-1"
+              className="text-xl font-bold border-none shadow-none focus-visible:ring-2 focus-visible:ring-primary/20 px-3 flex-1 bg-transparent"
               placeholder="Project Name"
               maxLength={100}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {hasUnsavedChanges && (
-              <span className="text-xs text-muted-foreground">Unsaved changes</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent/10 border border-accent/20">
+                <div className="h-2 w-2 rounded-full bg-accent animate-pulse"></div>
+                <span className="text-xs font-medium text-accent">Unsaved</span>
+              </div>
             )}
-            <Button variant="outline" onClick={handlePDFExport}>
+            <Button variant="outline" onClick={handlePDFExport} className="border-2 h-10">
               <Download className="h-4 w-4 mr-2" />
-              Download PDF
+              Export PDF
             </Button>
-            <Button onClick={handleSave} disabled={updateProject.isPending}>
+            <Button
+              onClick={handleSave}
+              disabled={updateProject.isPending}
+              className="h-10 px-6 shadow-md"
+            >
               {updateProject.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -212,19 +229,23 @@ export default function V2SpecEditor() {
         </div>
       </header>
 
-      {/* Main content with tabs for Editor and ESG Analysis */}
+      {/* Main content with enhanced tabs */}
       <Tabs defaultValue="editor" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="w-full rounded-none border-b border-border px-6">
-          <TabsTrigger value="editor">Editor</TabsTrigger>
-          <TabsTrigger value="esg">ESG Analysis</TabsTrigger>
+        <TabsList className="w-full rounded-none border-b-2 border-border px-6 h-12 bg-muted/30">
+          <TabsTrigger value="editor" className="text-base data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            Editor
+          </TabsTrigger>
+          <TabsTrigger value="esg" className="text-base data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            ESG Analysis
+          </TabsTrigger>
         </TabsList>
 
-        {/* Editor Tab - Three-panel layout */}
+        {/* Editor Tab - Three-panel layout with refined borders */}
         <TabsContent value="editor" className="flex-1 flex overflow-hidden m-0">
           {/* Left Sidebar: Project Navigator (top) + Master Library (bottom) */}
-          <aside className="w-96 border-r border-border bg-card flex flex-col">
+          <aside className="w-96 border-r-2 border-border bg-card flex flex-col shadow-sm">
             {/* Top half: Project Navigator */}
-            <div className="flex-1 overflow-y-auto border-b border-border">
+            <div className="flex-1 overflow-y-auto border-b-2 border-border">
               <ProjectNavigator
                 projectId={project.project_id}
                 clauses={clauses}
@@ -254,10 +275,10 @@ export default function V2SpecEditor() {
           </main>
         </TabsContent>
 
-        {/* ESG Analysis Tab */}
+        {/* ESG Analysis Tab with enhanced container */}
         <TabsContent value="esg" className="flex-1 overflow-hidden m-0">
-          <div className="h-full overflow-y-auto">
-            <div className="container mx-auto px-6 py-8 max-w-5xl">
+          <div className="h-full overflow-y-auto bg-muted/20">
+            <div className="container mx-auto px-6 py-8 max-w-6xl">
               <ESGReport projectId={project.project_id} />
             </div>
           </div>
