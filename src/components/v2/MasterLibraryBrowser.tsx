@@ -57,6 +57,12 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
     isLoading: productsLoading,
   } = useProductsForClause(selectedMasterClause?.master_clause_id || null, {
     enabled: productModalOpen && !!selectedMasterClause,
+    onSuccess: (data) => {
+      console.log('[MasterLibraryBrowser] Products loaded for clause:', selectedMasterClause?.master_clause_id, 'Count:', data.length, data);
+    },
+    onError: (error) => {
+      console.error('[MasterLibraryBrowser] Failed to load products:', error);
+    },
   });
 
   const toggleSection = (sectionId: string) => {
@@ -73,6 +79,7 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
 
   // Open product selection modal
   const handleOpenProductModal = (clause: MasterClause) => {
+    console.log('[MasterLibraryBrowser] Opening product modal for clause:', clause.master_clause_id, clause.title);
     setSelectedMasterClause(clause);
     setSelectedProductId(null);
     setProductModalOpen(true);

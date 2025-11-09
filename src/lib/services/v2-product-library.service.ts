@@ -29,6 +29,7 @@ class ProductLibraryError extends Error {
  */
 export async function getProductsForClause(masterClauseId: string): Promise<Product[]> {
   try {
+    console.log('[ProductLibraryService] Fetching products for master_clause_id:', masterClauseId);
     const { data, error } = await supabase
       .from('product_library')
       .select('*')
@@ -37,7 +38,11 @@ export async function getProductsForClause(masterClauseId: string): Promise<Prod
       .order('manufacturer', { ascending: true })
       .order('product_name', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ProductLibraryService] Query error:', error);
+      throw error;
+    }
+    console.log('[ProductLibraryService] Query returned:', data?.length || 0, 'products');
     return data || [];
   } catch (error) {
     throw new ProductLibraryError(
