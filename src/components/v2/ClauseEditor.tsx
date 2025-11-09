@@ -338,8 +338,14 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
   if (!clause) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <p className="text-sm">Select a clause to edit</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center px-6">
+          <div className="p-4 rounded-2xl bg-primary/10 inline-block mb-4">
+            <Package className="h-12 w-12 text-primary" />
+          </div>
+          <p className="text-lg font-medium text-foreground mb-2">No Clause Selected</p>
+          <p className="text-sm text-muted-foreground">Select a clause from the Project Navigator to begin editing</p>
+        </div>
       </div>
     );
   }
@@ -349,24 +355,29 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-6 border-b border-border">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="text-sm text-muted-foreground font-mono mb-1">
-              {isHybrid && clause.master_clause?.caws_number}
-              {isFreeform && clause.freeform_caws_number}
+      {/* Enhanced Header */}
+      <div className="p-6 border-b-2 border-border bg-gradient-to-r from-card to-secondary/10">
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-sm font-mono font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
+                {isHybrid && clause.master_clause?.caws_number}
+                {isFreeform && clause.freeform_caws_number}
+              </div>
+              {isHybrid && <span className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent font-medium">Master</span>}
+              {isFreeform && <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground font-medium">Custom</span>}
             </div>
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-3xl font-bold text-foreground leading-tight">
               {isHybrid && clause.master_clause?.title}
               {isFreeform && clause.freeform_title}
             </h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 ml-4">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setDeleteDialogOpen(true)}
+              className="border-2 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -379,25 +390,33 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
             <Button
               variant="secondary"
               onClick={() => setProductBrowserOpen(true)}
-              className="w-full"
+              className="w-full h-11 border-2 hover:border-accent"
             >
-              <Package className="h-4 w-4 mr-2" />
+              <Package className="h-5 w-5 mr-2" />
               Browse Product Library
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
               Select a manufacturer product to auto-fill the specification fields
             </p>
           </div>
         )}
 
         {hasUnsavedChanges && (
-          <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg px-4 py-2">
-            <span className="text-sm text-amber-900 dark:text-amber-200">
-              You have unsaved changes
-            </span>
-            <Button size="sm" onClick={handleSave} disabled={updateFieldValues.isPending || updateFreeform.isPending}>
+          <div className="flex items-center justify-between bg-accent/10 border-2 border-accent/30 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-accent animate-pulse"></div>
+              <span className="text-sm font-medium text-accent">
+                Unsaved changes
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={updateFieldValues.isPending || updateFreeform.isPending}
+              className="shadow-md h-9"
+            >
               <Save className="h-4 w-4 mr-2" />
-              Save
+              Save Now
             </Button>
           </div>
         )}
@@ -409,12 +428,19 @@ export function ClauseEditor({ projectId, clause, onClauseUpdated }: ClauseEdito
           {/* Hybrid Clause Editor */}
           {isHybrid && clause.master_clause && (
             <>
-              {/* Guidance text */}
+              {/* Guidance text with enhanced styling */}
               {clause.master_clause.guidance_text && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-                  <p className="text-sm text-blue-900 dark:text-blue-200">
-                    {clause.master_clause.guidance_text}
-                  </p>
+                <div className="bg-accent/10 border-2 border-accent/30 rounded-xl p-4">
+                  <div className="flex gap-2 items-start">
+                    <div className="p-1 rounded bg-accent/20 mt-0.5">
+                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed flex-1">
+                      {clause.master_clause.guidance_text}
+                    </p>
+                  </div>
                 </div>
               )}
 
