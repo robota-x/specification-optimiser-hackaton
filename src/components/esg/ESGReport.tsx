@@ -38,7 +38,7 @@ export function ESGReport({ projectId }: ESGReportProps) {
     loadData();
   }, [projectId]);
 
-  // Subscribe to real-time updates
+  // Subscribe to real-time updates + fallback polling
   useEffect(() => {
     // Subscribe to analysis job updates
     const unsubscribeJob = subscribeToAnalysisJob(projectId, (job) => {
@@ -60,12 +60,32 @@ export function ESGReport({ projectId }: ESGReportProps) {
       }
     });
 
+    // Fallback polling every 5 seconds when job is running
+    const pollInterval = setInterval(async () => {
+      if (analysisJob?.status === 'running' || analysisJob?.status === 'queued') {
+        console.log('Polling for job status update...');
+        try {
+          const job = await getLatestAnalysisJob(projectId);
+          if (job && job.status !== analysisJob.status) {
+            console.log('Job status changed via polling:', job.status);
+            setAnalysisJob(job);
+            if (job.status === 'complete') {
+              loadSuggestion();
+            }
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }
+    }, 5000);
+
     // Cleanup subscriptions on unmount
     return () => {
       unsubscribeJob();
       unsubscribeSuggestion();
+      clearInterval(pollInterval);
     };
-  }, [projectId]);
+  }, [projectId, analysisJob?.status]);
 
   const loadData = async () => {
     setIsLoading(true);
