@@ -1,22 +1,19 @@
-# Welcome to your Lovable project
+# Architectural Specification AI Green Optimiser
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/0a7950f1-7d4e-4118-b1b0-5f22bf938f94
+**Deployment URL**: https://specificationoptimiser.robota.dev
+**Project Name**: specification-optimiser-hackaton
 
-## How can I edit this code?
+## Overview
 
-There are several ways of editing your application.
+AI-powered specification builder for sustainable architectural projects. This tool helps architects and designers create optimized specifications with a focus on environmental sustainability and green building practices.
 
-**Use Lovable**
+## Development
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0a7950f1-7d4e-4118-b1b0-5f22bf938f94) and start prompting.
+**Local Development**
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Work locally using your preferred IDE:
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -115,14 +112,22 @@ The following authentication settings are configured:
 - **Anonymous Sign-ins**: Enabled
 - **Session Persistence**: Enabled (localStorage)
 
-## How can I deploy this project?
+## Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/0a7950f1-7d4e-4118-b1b0-5f22bf938f94) and click on Share -> Publish.
+The project is automatically deployed to Cloudflare Pages on push to the `main` branch.
 
-## Can I connect a custom domain to my Lovable project?
+**Deployment Pipeline:**
+1. Build the project
+2. Run Supabase migrations
+3. Deploy to Cloudflare Pages at https://specificationoptimiser.robota.dev
 
-Yes, you can!
+**Required GitHub Secrets:**
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_DB_PASSWORD`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Required Cloudflare Pages Environment Variables:**
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
