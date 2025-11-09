@@ -107,7 +107,7 @@ To enable Google social login, follow these steps:
 ### Authentication Settings
 
 The following authentication settings are configured:
-- **Email Confirmation**: Disabled (for simple SSO flow)
+- **Email Confirmation**: Enabled (users must verify their email before signing in)
 - **2FA/MFA**: Disabled
 - **Anonymous Sign-ins**: Enabled
 - **Session Persistence**: Enabled (localStorage)
