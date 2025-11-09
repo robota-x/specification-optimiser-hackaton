@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    name: Build (validation)
+    uses: ./.github/workflows/_build.yml
+    with:
+      upload-artifact: false
