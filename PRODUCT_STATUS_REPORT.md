@@ -37,7 +37,7 @@ The Architectural Specification AI Green Optimiser is a web-based tool for creat
 - Real-time subscriptions for live updates
 
 **AI/LLM Integration:**
-- Google Gemini API (gemini-1.5-flash)
+- Google Gemini API (gemini-2.5-flash-lite)
 - Secure edge function wrapper with rate limiting
 - NLP-based material extraction for ESG analysis
 
@@ -463,7 +463,7 @@ The application is **fully functional** using the v1 schema, but the v2 schema r
 
 **Implementation:**
 - Secure edge function: `supabase/functions/gemini-chat/`
-- Model: `gemini-1.5-flash` (fast, cost-effective)
+- Model: `gemini-2.5-flash-lite` (fast, cost-effective)
 - Authentication: Required (JWT token in Authorization header)
 - Rate Limiting: 10 requests/minute, 100 requests/hour per user
 - Request Logging: All requests logged to `gemini_requests` table

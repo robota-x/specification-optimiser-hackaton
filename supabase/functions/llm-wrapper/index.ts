@@ -6,6 +6,63 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const FUNCTION_NAME = 'llm-wrapper';
+const RATE_LIMIT_PER_MINUTE = 60; // Global rate limit: 60 requests per minute
+const RATE_LIMIT_PER_HOUR = 1000; // Global rate limit: 1000 requests per hour
+
+interface RateLimitResult {
+  allowed: boolean;
+  minuteCount?: number;
+  hourCount?: number;
+}
+
+/**
+ * Check global rate limits (across all users)
+ */
+async function checkGlobalRateLimit(
+  supabase: ReturnType<typeof createClient>
+): Promise<RateLimitResult> {
+  const now = new Date();
+  const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+  // Count successful requests in the last minute (global)
+  const { count: minuteCount, error: minuteError } = await supabase
+    .from('gemini_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('function_name', FUNCTION_NAME)
+    .eq('status', 'success')
+    .gte('created_at', oneMinuteAgo.toISOString());
+
+  if (minuteError) {
+    console.error('Error checking minute rate limit:', minuteError);
+    throw new Error('Failed to check rate limit');
+  }
+
+  if ((minuteCount || 0) >= RATE_LIMIT_PER_MINUTE) {
+    return { allowed: false, minuteCount: minuteCount || 0, hourCount: 0 };
+  }
+
+  // Count successful requests in the last hour (global)
+  const { count: hourCount, error: hourError } = await supabase
+    .from('gemini_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('function_name', FUNCTION_NAME)
+    .eq('status', 'success')
+    .gte('created_at', oneHourAgo.toISOString());
+
+  if (hourError) {
+    console.error('Error checking hour rate limit:', hourError);
+    throw new Error('Failed to check rate limit');
+  }
+
+  if ((hourCount || 0) >= RATE_LIMIT_PER_HOUR) {
+    return { allowed: false, minuteCount: minuteCount || 0, hourCount: hourCount || 0 };
+  }
+
+  return { allowed: true, minuteCount: minuteCount || 0, hourCount: hourCount || 0 };
+}
+
 /**
  * LLM Wrapper - Multi-purpose LLM function for ESG analysis
  *
@@ -189,18 +246,32 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Authenticate the user (optional for system calls)
+    // Authenticate the user (required)
     const authHeader = req.headers.get('Authorization');
-    let userId: string | null = null;
-
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-      if (!authError && user) {
-        userId = user.id;
-      }
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const userId = user.id;
 
     // Parse request body
     const requestBody = await req.json() as LLMRequest;
@@ -227,6 +298,61 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create pending entry in database for logging
+    const { data: requestLog, error: insertError } = await supabase
+      .from('gemini_requests')
+      .insert({
+        user_id: userId,
+        function_name: FUNCTION_NAME,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (insertError || !requestLog) {
+      console.error('Error creating request log:', insertError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to log request' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Check global rate limits
+    const rateLimitResult = await checkGlobalRateLimit(supabase);
+
+    if (!rateLimitResult.allowed) {
+      // Update request status to failed (rate limited)
+      await supabase
+        .from('gemini_requests')
+        .update({
+          status: 'failed',
+          error_message: 'Rate limit exceeded',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestLog.id);
+
+      return new Response(
+        JSON.stringify({
+          error: 'Rate limit exceeded',
+          details: {
+            minuteCount: rateLimitResult.minuteCount,
+            hourCount: rateLimitResult.hourCount,
+            limits: {
+              perMinute: RATE_LIMIT_PER_MINUTE,
+              perHour: RATE_LIMIT_PER_HOUR
+            }
+          }
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Initialize Gemini API
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
@@ -242,7 +368,7 @@ Deno.serve(async (req) => {
     const genAI = new GoogleGenerativeAI(geminiApiKey);
 
     // Use a more capable model for complex tasks
-    const modelName = prompt_type === 'report' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+    const modelName = prompt_type === 'report' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
     const model = genAI.getGenerativeModel({ model: modelName });
 
     // Build the appropriate prompt
@@ -258,7 +384,7 @@ Deno.serve(async (req) => {
         throw new Error('Invalid prompt_type');
     }
 
-    console.log(`Processing ${prompt_type} request${userId ? ` for user ${userId}` : ' (system)'}`);
+    console.log(`Processing ${prompt_type} request for user ${userId}`);
 
     try {
       // Call Gemini API
@@ -280,6 +406,16 @@ Deno.serve(async (req) => {
         console.error('Failed to parse LLM response as JSON:', parseError);
         console.error('Raw response:', text);
 
+        // Update request status to failed
+        await supabase
+          .from('gemini_requests')
+          .update({
+            status: 'failed',
+            error_message: 'Failed to parse LLM response as JSON',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', requestLog.id);
+
         return new Response(
           JSON.stringify({
             error: 'Failed to parse LLM response',
@@ -292,6 +428,15 @@ Deno.serve(async (req) => {
           }
         );
       }
+
+      // Update request status to success
+      await supabase
+        .from('gemini_requests')
+        .update({
+          status: 'success',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestLog.id);
 
       return new Response(
         JSON.stringify({
@@ -307,6 +452,16 @@ Deno.serve(async (req) => {
 
     } catch (geminiError) {
       console.error('Error calling Gemini API:', geminiError);
+
+      // Update request status to failed
+      await supabase
+        .from('gemini_requests')
+        .update({
+          status: 'failed',
+          error_message: geminiError instanceof Error ? geminiError.message : 'Unknown error',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestLog.id);
 
       return new Response(
         JSON.stringify({
