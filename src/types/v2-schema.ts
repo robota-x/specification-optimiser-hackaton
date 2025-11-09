@@ -299,6 +299,30 @@ export function isHybridClause(clause: ProjectClause): clause is ProjectClause &
 }
 
 /**
+ * Helper to check if clause has a selected product
+ * This detects when user has used ProductBrowser to select a product
+ */
+export function hasSelectedProduct(clause: ProjectClause): boolean {
+  return !!(
+    clause.field_values &&
+    typeof clause.field_values === 'object' &&
+    'selected_product_id' in clause.field_values &&
+    clause.field_values.selected_product_id
+  );
+}
+
+/**
+ * Helper to get selected product ID from clause
+ * Returns null if no product is selected
+ */
+export function getSelectedProductId(clause: ProjectClause): string | null {
+  if (!hasSelectedProduct(clause)) {
+    return null;
+  }
+  return clause.field_values!.selected_product_id as string;
+}
+
+/**
  * Helper to check if clause is freeform
  */
 export function isFreeformClause(clause: ProjectClause): clause is ProjectClause & { freeform_caws_number: string } {

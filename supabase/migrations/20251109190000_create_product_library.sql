@@ -16,7 +16,7 @@ CREATE TABLE product_library (
     master_clause_id UUID NOT NULL REFERENCES master_clause(master_clause_id) ON DELETE CASCADE,
 
     -- AI Hook (placeholder for future ESG optimization)
-    esg_material_id UUID REFERENCES esg_material_library(material_id) ON DELETE SET NULL,
+    esg_material_id UUID REFERENCES esg_material_library(esg_material_id) ON DELETE SET NULL,
 
     -- Product identification
     manufacturer VARCHAR(255) NOT NULL,
@@ -50,8 +50,9 @@ ON product_library(esg_material_id)
 WHERE esg_material_id IS NOT NULL;
 
 -- Full-text search on manufacturer + product name
-CREATE INDEX idx_product_library_search
-ON product_library USING gin((manufacturer || ' ' || product_name) gin_trgm_ops);
+-- Using standard B-tree index for prefix matching and LIKE queries
+CREATE INDEX idx_product_library_manufacturer ON product_library(manufacturer);
+CREATE INDEX idx_product_library_product_name ON product_library(product_name);
 
 -- JSONB search on product_data
 CREATE INDEX idx_product_library_product_data
@@ -155,8 +156,8 @@ RETURNS TABLE (
     product_data JSONB,
     esg_material_id UUID,
     material_name VARCHAR,
-    embodied_carbon_a1_a3 DECIMAL,
-    carbon_category VARCHAR,
+    embodied_carbon DECIMAL,
+    carbon_unit VARCHAR,
     is_active BOOLEAN
 )
 LANGUAGE sql
@@ -168,16 +169,16 @@ AS $$
         pl.product_name,
         pl.product_data,
         pl.esg_material_id,
-        esg.material_name,
-        esg.embodied_carbon_a1_a3,
-        esg.carbon_category,
+        esg.name AS material_name,
+        esg.embodied_carbon,
+        esg.carbon_unit,
         pl.is_active
     FROM product_library pl
-    LEFT JOIN esg_material_library esg ON pl.esg_material_id = esg.material_id
+    LEFT JOIN esg_material_library esg ON pl.esg_material_id = esg.esg_material_id
     WHERE pl.master_clause_id = p_master_clause_id
       AND pl.is_active = TRUE
     ORDER BY
-        esg.embodied_carbon_a1_a3 ASC NULLS LAST,
+        esg.embodied_carbon ASC NULLS LAST,
         pl.manufacturer ASC,
         pl.product_name ASC;
 $$;

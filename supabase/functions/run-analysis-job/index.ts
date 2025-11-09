@@ -54,10 +54,26 @@ interface Suggestion {
   modifications: string;
 }
 
+interface ExtractedProduct {
+  product_id: string;
+  product_name: string;
+  esg_material_id: string | null;
+  manufacturer: string;
+  clause_id: string;
+}
+
+interface ExtractionResult {
+  text: string;
+  products: ExtractedProduct[];
+}
+
 /**
- * Extract all text content from project clauses
+ * Extract all text content and product selections from project clauses
+ * This implements the "Hybrid Analysis" approach:
+ * - Path A (Easy): Extract products with direct ESG links
+ * - Path B (Hard): Extract text for NLP processing
  */
-async function extractProjectText(supabase: any, projectId: string): Promise<string> {
+async function extractProjectContent(supabase: any, projectId: string): Promise<ExtractionResult> {
   // Fetch all project clauses with their master clause templates
   const { data: clauses, error } = await supabase
     .from('project_clause')
@@ -84,20 +100,52 @@ async function extractProjectText(supabase: any, projectId: string): Promise<str
 
   if (!clauses || clauses.length === 0) {
     console.log('No clauses found for project');
-    return '';
+    return { text: '', products: [] };
   }
 
   console.log(`Found ${clauses.length} clauses for project ${projectId}`);
 
-  // Build a comprehensive text blob
+  // Build result with both text and products
   const textParts: string[] = [];
+  const extractedProducts: ExtractedProduct[] = [];
 
   for (const clause of clauses) {
     // Add CAWS number and context
     textParts.push(`\n--- CLAUSE ${clause.caws_number} ---`);
 
     if (clause.master_clause_id && clause.master_clause) {
-      // Hybrid clause - use template with field values
+      // Hybrid clause - check for product selection FIRST (Path A - Easy)
+      if (clause.field_values && typeof clause.field_values === 'object') {
+        const fieldValues = clause.field_values as Record<string, any>;
+
+        // Check if user selected a product from ProductBrowser
+        if (fieldValues.selected_product_id) {
+          console.log(`Found product selection in clause ${clause.project_clause_id}: ${fieldValues.selected_product_id}`);
+
+          // Query product_library to get product details and ESG link
+          const { data: product, error: productError } = await supabase
+            .from('product_library')
+            .select('product_id, product_name, manufacturer, esg_material_id')
+            .eq('product_id', fieldValues.selected_product_id)
+            .single();
+
+          if (!productError && product) {
+            extractedProducts.push({
+              product_id: product.product_id,
+              product_name: product.product_name,
+              manufacturer: product.manufacturer,
+              esg_material_id: product.esg_material_id,
+              clause_id: clause.project_clause_id
+            });
+
+            console.log(`Extracted product: ${product.manufacturer} - ${product.product_name} (ESG ID: ${product.esg_material_id})`);
+          } else {
+            console.warn(`Product ${fieldValues.selected_product_id} not found in library`);
+          }
+        }
+      }
+
+      // Then build text for NLP extraction (Path B - Hard)
       textParts.push(`Title: ${clause.master_clause.short_title}`);
 
       let renderedText = clause.master_clause.body_template || '';
@@ -107,6 +155,11 @@ async function extractProjectText(supabase: any, projectId: string): Promise<str
         const fieldValues = clause.field_values as Record<string, any>;
 
         for (const [key, value] of Object.entries(fieldValues)) {
+          // Skip product-related fields (already extracted via Path A)
+          if (key === 'selected_product_id' || key.startsWith('product_')) {
+            continue;
+          }
+
           if (value !== null && value !== undefined) {
             const placeholder = `{{${key}}}`;
             const replacement = Array.isArray(value) ? value.join(', ') : String(value);
@@ -117,12 +170,17 @@ async function extractProjectText(supabase: any, projectId: string): Promise<str
 
       textParts.push(renderedText);
     } else if (clause.freeform_body) {
-      // Freeform clause
+      // Freeform clause - only text extraction (Path B)
       textParts.push(clause.freeform_body);
     }
   }
 
-  return textParts.join('\n\n');
+  console.log(`Extracted ${extractedProducts.length} products with direct links`);
+
+  return {
+    text: textParts.join('\n\n'),
+    products: extractedProducts
+  };
 }
 
 /**
@@ -160,10 +218,12 @@ async function callLLMExtraction(supabaseUrl: string, serviceKey: string, text: 
 
 /**
  * Link extracted materials to the ESG Material Library
+ * This implements both Path A (direct product links) and Path B (NLP matching)
  */
 async function linkMaterialsToLibrary(
   supabase: any,
-  extractedMaterials: ExtractedMaterial[]
+  extractedMaterials: ExtractedMaterial[],
+  extractedProducts: ExtractedProduct[]
 ): Promise<Map<string, ESGMaterial>> {
   // Fetch all materials from the library (global materials only for now)
   const { data: libraryMaterials, error } = await supabase
@@ -181,7 +241,32 @@ async function linkMaterialsToLibrary(
 
   const linkedMaterials = new Map<string, ESGMaterial>();
 
-  // For each extracted material, find the best match in the library
+  // PATH A (EASY): Process products with direct ESG links first
+  console.log(`Processing ${extractedProducts.length} products with direct ESG links...`);
+
+  for (const product of extractedProducts) {
+    if (product.esg_material_id) {
+      // Direct lookup - no NLP needed!
+      const material = libraryMaterials.find((lib: ESGMaterial) =>
+        lib.esg_material_id === product.esg_material_id
+      );
+
+      if (material) {
+        console.log(`✓ Direct link: ${product.manufacturer} - ${product.product_name} → ${material.name}`);
+        linkedMaterials.set(material.esg_material_id, material);
+      } else {
+        console.warn(`Product ${product.product_name} has esg_material_id ${product.esg_material_id} but material not found in library`);
+      }
+    } else {
+      console.warn(`Product ${product.product_name} does not have esg_material_id - skipping direct link`);
+    }
+  }
+
+  console.log(`Linked ${linkedMaterials.size} materials via direct product links (Path A)`);
+
+  // PATH B (HARD): For each extracted material from text, find the best match using NLP
+  console.log(`Processing ${extractedMaterials.length} text-extracted materials via NLP...`);
+
   for (const extracted of extractedMaterials) {
     const extractedName = extracted.material.toLowerCase().trim();
 
@@ -442,12 +527,12 @@ Deno.serve(async (req) => {
 
       const projectName = project.project_name || 'Untitled Project';
 
-      // Step A: Extract materials from project text
-      console.log('Step A: Extracting project text...');
-      const projectText = await extractProjectText(supabase, project_id);
+      // Step A: Extract materials from project (both products and text)
+      console.log('Step A: Extracting project content (products + text)...');
+      const extractionResult = await extractProjectContent(supabase, project_id);
 
-      if (!projectText || projectText.trim().length === 0) {
-        console.log('No text content found in project');
+      if ((!extractionResult.text || extractionResult.text.trim().length === 0) && extractionResult.products.length === 0) {
+        console.log('No content found in project (no text and no products)');
 
         // Create a "no content" report
         await supabase
@@ -486,16 +571,27 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Extracted ${projectText.length} characters of text`);
+      console.log(`Extracted ${extractionResult.products.length} products and ${extractionResult.text.length} characters of text`);
 
-      console.log('Step A: Calling LLM for material extraction...');
-      const extractedMaterials = await callLLMExtraction(supabaseUrl, supabaseServiceKey, projectText);
-      console.log(`Extracted ${extractedMaterials.length} materials`);
+      // Step A (continued): Call LLM for text-based material extraction (Path B)
+      let extractedMaterials: ExtractedMaterial[] = [];
 
-      // Step B: Link materials to library
+      if (extractionResult.text && extractionResult.text.trim().length > 0) {
+        console.log('Step A: Calling LLM for text-based material extraction (Path B)...');
+        extractedMaterials = await callLLMExtraction(supabaseUrl, supabaseServiceKey, extractionResult.text);
+        console.log(`Extracted ${extractedMaterials.length} materials from text via NLP`);
+      } else {
+        console.log('No text content to extract - skipping LLM call');
+      }
+
+      // Step B: Link materials to library (both Path A products and Path B text)
       console.log('Step B: Linking materials to library...');
-      const linkedMaterials = await linkMaterialsToLibrary(supabase, extractedMaterials);
-      console.log(`Linked ${linkedMaterials.size} materials to library`);
+      const linkedMaterials = await linkMaterialsToLibrary(
+        supabase,
+        extractedMaterials,
+        extractionResult.products
+      );
+      console.log(`Linked ${linkedMaterials.size} total materials to library`);
 
       if (linkedMaterials.size === 0) {
         // No materials found - create a report saying so
