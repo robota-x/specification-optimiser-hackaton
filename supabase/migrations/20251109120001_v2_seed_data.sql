@@ -121,7 +121,7 @@ ON CONFLICT (organisation_id, caws_code) DO NOTHING;
 INSERT INTO master_work_section (work_section_id, organisation_id, caws_group, caws_code, title, description, sort_order)
 VALUES
     (
-        '20000000-0000-0000-0000-0000000000m1',
+        '20000000-0000-0000-0000-0000000000d1',
         '00000000-0000-0000-0000-000000000001',
         'M',
         'M10',
@@ -130,7 +130,7 @@ VALUES
         200
     ),
     (
-        '20000000-0000-0000-0000-0000000000m2',
+        '20000000-0000-0000-0000-0000000000d2',
         '00000000-0000-0000-0000-000000000001',
         'M',
         'M20',
@@ -139,7 +139,7 @@ VALUES
         210
     ),
     (
-        '20000000-0000-0000-0000-0000000000m4',
+        '20000000-0000-0000-0000-0000000000d4',
         '00000000-0000-0000-0000-000000000001',
         'M',
         'M40',
@@ -315,8 +315,8 @@ INSERT INTO master_clause (
 VALUES
     -- M10/305 - AGGREGATES
     (
-        '30000000-0000-0000-0000-0000000000m1',
-        '20000000-0000-0000-0000-0000000000m1',
+        '30000000-0000-0000-0000-0000000000d1',
+        '20000000-0000-0000-0000-0000000000d1',
         'M10/305',
         'AGGREGATES',
         E'Aggregates for screeds: {{aggregate_type}}. To {{standard}}.\n\nGrading: {{grading}}\nMaximum size: {{max_size}}',
@@ -333,8 +333,8 @@ VALUES
 
     -- M10/410 - CEMENT:SAND SCREEDS
     (
-        '30000000-0000-0000-0000-0000000000m2',
-        '20000000-0000-0000-0000-0000000000m1',
+        '30000000-0000-0000-0000-0000000000d2',
+        '20000000-0000-0000-0000-0000000000d1',
         'M10/410',
         'CEMENT:SAND SCREEDS',
         E'Cement:sand screed: {{mix_ratio}} mix.\n\nThickness: {{thickness}}\nFinish: {{finish_type}}\n\nBase preparation: {{base_prep}}\nCuring: {{curing_method}}',
@@ -352,8 +352,8 @@ VALUES
 
     -- M20/110 - PLASTERED COATINGS
     (
-        '30000000-0000-0000-0000-0000000000m3',
-        '20000000-0000-0000-0000-0000000000m2',
+        '30000000-0000-0000-0000-0000000000d3',
+        '20000000-0000-0000-0000-0000000000d2',
         'M20/110',
         'PLASTERED COATINGS',
         E'Plaster: {{plaster_type}}. To {{standard}}.\n\nCoats: {{number_of_coats}}\nTotal thickness: {{total_thickness}}\nFinish: {{finish_quality}}',
@@ -371,8 +371,8 @@ VALUES
 
     -- M40/220 - CERAMIC WALL TILING
     (
-        '30000000-0000-0000-0000-0000000000m4',
-        '20000000-0000-0000-0000-0000000000m4',
+        '30000000-0000-0000-0000-0000000000d4',
+        '20000000-0000-0000-0000-0000000000d4',
         'M40/220',
         'CERAMIC WALL TILING',
         E'Ceramic wall tiles: {{product_name}}.\n\nSize: {{tile_size}}\nColour/finish: {{colour_finish}}\nGrading: {{grading}}\n\nAdhesive: {{adhesive_type}} to {{adhesive_standard}}\nGrout: {{grout_type}} to {{grout_standard}}\nJoint width: {{joint_width}}',
