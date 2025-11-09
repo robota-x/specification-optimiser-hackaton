@@ -181,7 +181,7 @@ BEGIN
     RAISE NOTICE 'Total active products: %', v_total_products;
     RAISE NOTICE 'Products with ESG links: %', v_linked_products;
     RAISE NOTICE 'Products without ESG links: %', v_unlinked_products;
-    RAISE NOTICE 'Coverage: %% ', ROUND((v_linked_products::numeric / NULLIF(v_total_products, 0) * 100), 2);
+    RAISE NOTICE 'Coverage: %%%', ROUND((v_linked_products::numeric / NULLIF(v_total_products, 0) * 100), 2);
 END $$;
 
 -- =====================================================================
