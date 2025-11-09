@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAddHybridClause, useAddFreeformClause } from '@/hooks/useV2Projects';
 import { cn } from '@/lib/utils';
 import type { MasterLibrary, MasterWorkSectionWithClauses, MasterClause } from '@/types/v2-schema';
-import { ChevronRight, ChevronDown, Plus, Search, FileText } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Search, FileText, ArrowRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useProductsForClause } from '@/hooks/useV2ProductLibrary';
+import type { Product } from '@/types/v2-schema';
+import { Package, CheckCircle } from 'lucide-react';
 
 interface MasterLibraryBrowserProps {
   projectId: string;
@@ -39,9 +42,22 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
     body: '',
   });
 
+  // Product selection modal state
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [selectedMasterClause, setSelectedMasterClause] = useState<MasterClause | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
   // Mutations
   const addHybridClause = useAddHybridClause();
   const addFreeformClause = useAddFreeformClause();
+
+  // Fetch products for selected clause
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+  } = useProductsForClause(selectedMasterClause?.master_clause_id || null, {
+    enabled: productModalOpen && !!selectedMasterClause,
+  });
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => {
@@ -55,17 +71,59 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
     });
   };
 
-  const handleAddMasterClause = async (masterClauseId: string, title: string) => {
+  // Open product selection modal
+  const handleOpenProductModal = (clause: MasterClause) => {
+    setSelectedMasterClause(clause);
+    setSelectedProductId(null);
+    setProductModalOpen(true);
+  };
+
+  // Add clause manually (without product)
+  const handleAddManually = async () => {
+    if (!selectedMasterClause) return;
+
     try {
       await addHybridClause.mutateAsync({
         projectId,
-        masterClauseId,
+        masterClauseId: selectedMasterClause.master_clause_id,
       });
 
       toast({
         title: 'Clause added',
-        description: `${title} has been added to your project`,
+        description: `${selectedMasterClause.title} has been added to your project`,
       });
+
+      setProductModalOpen(false);
+      setSelectedMasterClause(null);
+    } catch (error: any) {
+      toast({
+        title: 'Error adding clause',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Add clause with selected product
+  const handleAddWithProduct = async () => {
+    if (!selectedMasterClause || !selectedProductId) return;
+
+    try {
+      await addHybridClause.mutateAsync({
+        projectId,
+        masterClauseId: selectedMasterClause.master_clause_id,
+        productId: selectedProductId,
+      });
+
+      const selectedProduct = products.find((p) => p.product_id === selectedProductId);
+      toast({
+        title: 'Clause added with product',
+        description: `${selectedMasterClause.title} has been added with ${selectedProduct?.product_name}`,
+      });
+
+      setProductModalOpen(false);
+      setSelectedMasterClause(null);
+      setSelectedProductId(null);
     } catch (error: any) {
       toast({
         title: 'Error adding clause',
@@ -235,14 +293,12 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
                               <TooltipTrigger asChild>
                                 <Button
                                   size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:bg-accent hover:text-accent-foreground"
-                                  onClick={() =>
-                                    handleAddMasterClause(clause.master_clause_id, clause.title)
-                                  }
+                                  variant="default"
+                                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 shadow-md"
+                                  onClick={() => handleOpenProductModal(clause)}
                                   disabled={addHybridClause.isPending}
                                 >
-                                  <Plus className="h-4 w-4" />
+                                  <ArrowRight className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="left">
@@ -320,6 +376,177 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
             >
               Add Clause
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Selection Modal */}
+      <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] border-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-muted-foreground" />
+              Add Clause to Project
+            </DialogTitle>
+            <DialogDescription>
+              {selectedMasterClause && (
+                <span className="font-medium">
+                  {selectedMasterClause.caws_number} - {selectedMasterClause.title}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[400px] pr-4">
+            <div className="space-y-4">
+              {/* Fill Manually Option */}
+              <button
+                onClick={() => setSelectedProductId('manual')}
+                className={`
+                  w-full text-left p-4 rounded-lg border-2 transition-all
+                  ${
+                    selectedProductId === 'manual'
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                  }
+                `}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="font-medium mb-1">Fill Manually</div>
+                    <div className="text-xs text-muted-foreground">
+                      Add an empty clause and fill in the fields yourself
+                    </div>
+                  </div>
+                  {selectedProductId === 'manual' && (
+                    <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                  )}
+                </div>
+              </button>
+
+              {/* Loading State */}
+              {productsLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-sm text-muted-foreground">Loading products...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Products List */}
+              {!productsLoading && products.length > 0 && (
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                    Or select from product library
+                  </div>
+                  {(() => {
+                    // Group products by manufacturer
+                    const productsByManufacturer = products.reduce((acc, product) => {
+                      if (!acc[product.manufacturer]) {
+                        acc[product.manufacturer] = [];
+                      }
+                      acc[product.manufacturer].push(product);
+                      return acc;
+                    }, {} as Record<string, Product[]>);
+
+                    const manufacturers = Object.keys(productsByManufacturer).sort();
+
+                    return manufacturers.map((manufacturer) => (
+                      <div key={manufacturer} className="space-y-2">
+                        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide px-1">
+                          {manufacturer}
+                        </h3>
+                        <div className="space-y-2">
+                          {productsByManufacturer[manufacturer].map((product) => {
+                            const isSelected = selectedProductId === product.product_id;
+                            return (
+                              <button
+                                key={product.product_id}
+                                onClick={() => setSelectedProductId(product.product_id)}
+                                className={`
+                                  w-full text-left p-4 rounded-lg border-2 transition-all
+                                  ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/5 shadow-sm'
+                                      : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                                  }
+                                `}
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="font-medium mb-1">{product.product_name}</div>
+                                    {product.product_data && Object.keys(product.product_data).length > 0 && (
+                                      <div className="text-xs text-muted-foreground space-y-0.5">
+                                        {Object.entries(product.product_data)
+                                          .slice(0, 3)
+                                          .map(([key, value]) => (
+                                            <div key={key}>
+                                              <span className="font-medium capitalize">
+                                                {key.replace(/_/g, ' ')}:
+                                              </span>{' '}
+                                              {String(value)}
+                                            </div>
+                                          ))}
+                                        {Object.keys(product.product_data).length > 3 && (
+                                          <div className="text-muted-foreground/70 italic">
+                                            +{Object.keys(product.product_data).length - 3} more fields
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {isSelected && (
+                                    <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
+              {/* Empty state when no products */}
+              {!productsLoading && products.length === 0 && (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No products available in the library for this clause.
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {products.length > 0 && (
+                <span>
+                  {products.length} {products.length === 1 ? 'product' : 'products'} available
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setProductModalOpen(false);
+                  setSelectedProductId(null);
+                  setSelectedMasterClause(null);
+                }}
+                className="border-2"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={selectedProductId === 'manual' ? handleAddManually : handleAddWithProduct}
+                disabled={!selectedProductId || addHybridClause.isPending}
+                className="shadow-md"
+              >
+                {addHybridClause.isPending ? 'Adding...' : 'Add to Project'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
