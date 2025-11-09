@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SpecContentBlock, BlockValues, BlockTemplate, CustomBlock } from "@/types/blocks";
 import { serializeBlockValues } from "./blockUtils";
+import { validateCustomBlock, validateBlockValues } from "./validation";
 
 /**
  * Load all spec content for a spec with joined template/custom block data
@@ -36,6 +37,9 @@ export async function addTemplateBlock(
   position: number,
   initialValues: BlockValues
 ): Promise<string> {
+  // Validate field values
+  const validatedValues = validateBlockValues(initialValues);
+  
   const { data, error } = await supabase
     .from("spec_content")
     .insert({
@@ -43,7 +47,7 @@ export async function addTemplateBlock(
       block_type: "template",
       block_template_id: templateId,
       position,
-      field_values: initialValues as any,
+      field_values: validatedValues as any,
     })
     .select()
     .single();
@@ -84,9 +88,12 @@ export async function updateBlockValues(
   blockId: string,
   values: BlockValues
 ): Promise<void> {
+  // Validate field values
+  const validatedValues = validateBlockValues(values);
+  
   const { error } = await supabase
     .from("spec_content")
-    .update({ field_values: values as any })
+    .update({ field_values: validatedValues as any })
     .eq("id", blockId);
 
   if (error) throw error;
@@ -98,7 +105,13 @@ export async function updateBlockValues(
 export async function batchUpdateBlockValues(
   updates: { id: string; values: BlockValues }[]
 ): Promise<void> {
-  const promises = updates.map((update) =>
+  // Validate all field values first
+  const validatedUpdates = updates.map((update) => ({
+    id: update.id,
+    values: validateBlockValues(update.values),
+  }));
+  
+  const promises = validatedUpdates.map((update) =>
     supabase
       .from("spec_content")
       .update({ field_values: update.values as any })
@@ -154,12 +167,15 @@ export async function createCustomBlock(
   title: string,
   markdownContent: string
 ): Promise<string> {
+  // Validate custom block data
+  const validatedData = validateCustomBlock({ title, markdown_content: markdownContent });
+  
   const { data, error } = await supabase
     .from("custom_blocks")
     .insert({
       user_id: userId,
-      title,
-      markdown_content: markdownContent,
+      title: validatedData.title,
+      markdown_content: validatedData.markdown_content,
     })
     .select()
     .single();
@@ -177,11 +193,14 @@ export async function updateCustomBlock(
   title: string,
   markdownContent: string
 ): Promise<void> {
+  // Validate custom block data
+  const validatedData = validateCustomBlock({ title, markdown_content: markdownContent });
+  
   const { error } = await supabase
     .from("custom_blocks")
     .update({
-      title,
-      markdown_content: markdownContent,
+      title: validatedData.title,
+      markdown_content: validatedData.markdown_content,
     })
     .eq("id", blockId);
 

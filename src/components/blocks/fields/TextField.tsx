@@ -21,6 +21,7 @@ export function TextField({ label, value, onChange, placeholder, required }: Tex
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
+        maxLength={500}
       />
     </div>
   );

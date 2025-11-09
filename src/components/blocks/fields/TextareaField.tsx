@@ -22,6 +22,7 @@ export function TextareaField({ label, value, onChange, placeholder, required }:
         placeholder={placeholder}
         required={required}
         rows={4}
+        maxLength={5000}
       />
     </div>
   );

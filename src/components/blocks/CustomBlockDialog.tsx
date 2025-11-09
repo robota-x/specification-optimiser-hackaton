@@ -69,7 +69,11 @@ export function CustomBlockDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Standard Terms & Conditions"
+              maxLength={100}
             />
+            <p className="text-xs text-muted-foreground">
+              {title.length}/100 characters
+            </p>
           </div>
 
           <MarkdownEditor
@@ -77,6 +81,9 @@ export function CustomBlockDialog({
             onChange={setContent}
             label="Content"
           />
+          <p className="text-xs text-muted-foreground">
+            {content.length}/5000 characters
+          </p>
         </div>
 
         <DialogFooter>
