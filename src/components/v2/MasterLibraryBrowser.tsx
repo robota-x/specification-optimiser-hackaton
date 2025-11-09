@@ -116,16 +116,32 @@ export function MasterLibraryBrowser({ projectId, masterLibrary }: MasterLibrary
     if (!selectedMasterClause || !selectedProductId) return;
 
     try {
+      // Find the selected product to extract its data
+      const selectedProduct = products.find((p) => p.product_id === selectedProductId);
+      if (!selectedProduct) {
+        toast({
+          title: 'Error',
+          description: 'Selected product not found',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Build initial field values from product_data, including the selected_product_id
+      const initialFieldValues: Record<string, any> = {
+        selected_product_id: selectedProductId,
+        ...(selectedProduct.product_data || {}),
+      };
+
       await addHybridClause.mutateAsync({
         projectId,
         masterClauseId: selectedMasterClause.master_clause_id,
-        productId: selectedProductId,
+        initialFieldValues,
       });
 
-      const selectedProduct = products.find((p) => p.product_id === selectedProductId);
       toast({
         title: 'Clause added with product',
-        description: `${selectedMasterClause.title} has been added with ${selectedProduct?.product_name}`,
+        description: `${selectedMasterClause.title} has been added with ${selectedProduct.product_name}`,
       });
 
       setProductModalOpen(false);
